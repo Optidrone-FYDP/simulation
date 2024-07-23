@@ -1,5 +1,6 @@
 import json
 from scipy.interpolate import interp1d
+import os
 
 """
 uses kinematic equations to calculate the new positions and velocities, and outputs final x y z position in mm:
@@ -16,16 +17,16 @@ class PositionPredictor:
         self.potentiometer_map = potentiometer_map  # from ingestion output json
         self.setup_interpolation()  # only used if user input has unmapped pot values
 
-    def setup_interpolation(self):
+    def setup_interpolation(self):  # bork something is bork here
         """
         set up interpolation based on the potentiometer map provided by ingestion step
         """
         self.interpolators = {}
         for i in range(3):  # range 3 = 3 axis
-            pot = []
-            accel = []
+            pot, accel = [], []
             for key, value in self.potentiometer_map.items():
-                pot.append(int(key, 10))
+                pot_value = int(key)
+                pot.append(pot_value)
                 accel.append(value[i])
             self.interpolators[i] = interp1d(pot, accel, fill_value="extrapolate")
 
@@ -34,10 +35,10 @@ class PositionPredictor:
         dataset to interpolate on is in setup_interpolation()
         """
         try:
-            pot_value = int(pot_input, 10)
+            pot_value = int(pot_input)
             return [self.interpolators[i](pot_value) for i in range(3)]
         except Exception as e:
-            print(f"Interpolation error: {e}")
+            print(f"interpolation process exploded with error: {e}")
             return [0, 0, 0]
 
     def update_position(self, pot_input, duration):
@@ -48,7 +49,7 @@ class PositionPredictor:
             acceleration = self.potentiometer_map[pot_input]
         else:
             print(
-                f"User potentiometer input '{pot_input}' could not be mapped to a known value, to use interpolation."
+                f"User potentiometer input '{pot_input}' could not be mapped to a known value, using interpolation."
             )
             acceleration = self.interpolate_acceleration(pot_input)
 
@@ -60,8 +61,9 @@ class PositionPredictor:
             # calculate new velocity
             self.velocity[i] += acceleration[i] * duration
 
+        formatted_position = [f"{pos:.2f}" for pos in self.position]  # ugly np float
         print(
-            f"New position (x,y,z) in mm after user potentiometer input (xxxyyyzzz) '{pot_input}' applied for {duration} seconds: {self.position}"
+            f"New position (x,y,z) in mm after user potentiometer input (xxxyyyzzz) '{pot_input}' applied for {duration} seconds: {formatted_position}"
         )
 
     def get_position(self):  # simple get
@@ -116,7 +118,8 @@ def validate_commands(data):
 
 
 def main():
-    potentiometer_map = load_json("potentiometer_map.json")
+    potentiometer_map_file = os.path.join("out", "accelerations.json")
+    potentiometer_map = load_json(potentiometer_map_file)
     validate_potentiometer_map(potentiometer_map)
 
     # json validation
@@ -133,7 +136,10 @@ def main():
         predictor.update_position(pot_input, duration)
 
     final_position = predictor.get_position()
-    print(f"Final position (x,y,z) in mm is: {final_position}")
+    formatted_final_position = [
+        f"{pos:.2f}" for pos in final_position
+    ]  # ugly np floats
+    print(f"Final position (x,y,z) in mm is: {formatted_final_position}")
 
 
 if __name__ == "__main__":

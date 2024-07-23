@@ -131,12 +131,12 @@ def plot_results(data, output_dir):
         avg_acceleration = np.mean(accelerations, axis=0)
 
         pot_key = f"{metadata.pot_x:03d}{metadata.pot_y:03d}{metadata.pot_z:03d}"
-        result_mapping[pot_key] = avg_acceleration[1]
-        # result_mapping[pot_key] = [
-        #     avg_acceleration[0],
-        #     avg_acceleration[1],
-        #     avg_acceleration[2],
-        # ]
+        # result_mapping[pot_key] = avg_acceleration[1]
+        result_mapping[pot_key] = [
+            avg_acceleration[0],
+            avg_acceleration[1],
+            avg_acceleration[2],
+        ]
 
         plt.figure(figsize=(12, 12))
 

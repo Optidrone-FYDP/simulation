@@ -159,7 +159,10 @@ def plot_results(data, output_dir):
             avg_acceleration[0], color="b", linestyle="--", label="Avg Acceleration X"
         )
         plt.axhline(
-            avg_acceleration[1], color="#ffa500", linestyle="--", label="Avg Acceleration Y"
+            avg_acceleration[1],
+            color="#ffa500",
+            linestyle="--",
+            label="Avg Acceleration Y",
         )
         plt.axhline(
             avg_acceleration[2], color="g", linestyle="--", label="Avg Acceleration Z"
@@ -184,6 +187,43 @@ def plot_results(data, output_dir):
 
     with open(f"{output_dir}/accelerations.json", "w") as json_file:
         json.dump(result_mapping, json_file, indent=4)
+
+    pot_values = []
+    avg_acc_y = []
+
+    for key, value in result_mapping.items():
+        pot_y = int(key[3:6])  # Extract Y potentiometer value
+        acc_y = float(value[1])  # Extract average Y acceleration
+        pot_values.append(pot_y)
+        avg_acc_y.append(acc_y)
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(pot_values, avg_acc_y, c="blue", marker="o")
+
+    fit = np.polyfit(pot_values, avg_acc_y, 1)
+    fit_fn = np.poly1d(fit)
+
+    line_equation = f"y = {fit[0]:.2f}x + {fit[1]:.2f}"
+    plt.text(
+        0.05,
+        0.95,
+        line_equation,
+        transform=plt.gca().transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"),
+    )
+
+    # Plot line of best fit
+    plt.plot(pot_values, fit_fn(pot_values), "r--", label="Best fit line")
+    plt.axvline(x=64, color="green", linestyle="--", label="pot_y = 64")
+
+    plt.title("Potentiometer Y Values vs. Average Y Acceleration")
+    plt.xlabel("Potentiometer Y Value")
+    plt.ylabel("Average Y Acceleration (mm/s^2)")
+    plt.grid(True)
+    plt.savefig(os.path.join(output_dir, "potentiometer_y_vs_acceleration_y.png"))
+    plt.close()
 
 
 # Main function

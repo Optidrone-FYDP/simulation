@@ -1,9 +1,10 @@
 import os
+import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from config import DATA_DIR, OUTPUT_DIR, BATCH_SIZE, INTERPOLATE
+from config import DATA_DIR, OUTPUT_DIR, BATCH_SIZE, INTERPOLATE, CUTOFF
 
 
 class Metadata:
@@ -41,7 +42,7 @@ def extract_metadata_from(file_name):
     # TODO: more validation. Also, consider making the naming format easily ordered
     try:
         return Metadata(
-            id=int(inputs[0][1:]),
+            id=int(inputs[0]),
             start_frame=int(inputs[1][1:]),
             end_frame=int(inputs[2][1:]),
             pot_x=int(inputs[3][1:]),
@@ -59,12 +60,14 @@ def extract_position_data_from(
     df = pd.read_csv(
         file_path, skiprows=[0, 1, 2, 4], usecols=["Frame", "TX", "TY", "TZ"]
     )
-    df.set_index('Frame', inplace=True)
+    df.set_index("Frame", inplace=True)
 
     if interpolate:
-        df.interpolate(method='linear', inplace=True) # interpolate missing values-- csv sometimes has blank frames
+        df.interpolate(
+            method="linear", inplace=True
+        )  # interpolate missing values-- csv sometimes has blank frames
 
-    if start_frame is not None and end_frame is not None:
+    if start_frame is not None and end_frame is not None and CUTOFF:
         df = df[start_frame:end_frame]
 
     positions = df[["TX", "TY", "TZ"]].astype(float)
@@ -109,12 +112,14 @@ def calculate_acceleration(positions, fps):
     time_step = 1.0 / fps
     velocities = np.diff(positions, axis=0) / time_step
     accelerations = np.diff(velocities, axis=0) / time_step
-    return accelerations
+    return accelerations, velocities
 
 
 def plot_results(data, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    result_mapping = {}
 
     for trial in data:
         print(trial)
@@ -122,12 +127,20 @@ def plot_results(data, output_dir):
         print(positions)
         metadata = trial.metadata
 
-        accelerations = calculate_acceleration(positions, metadata.fps)
+        accelerations, velocities = calculate_acceleration(positions, metadata.fps)
+        avg_acceleration = np.mean(accelerations, axis=0)
 
-        plt.figure(figsize=(12, 8))
+        pot_key = f"{metadata.pot_x:03d}{metadata.pot_y:03d}{metadata.pot_z:03d}"
+        result_mapping[pot_key] = [
+            avg_acceleration[0],
+            avg_acceleration[1],
+            avg_acceleration[2],
+        ]
+
+        plt.figure(figsize=(12, 12))
 
         # Plot positions
-        plt.subplot(2, 1, 1)
+        plt.subplot(3, 1, 1)
         plt.plot(positions[:, 0], label="Position X")
         plt.plot(positions[:, 1], label="Position Y")
         plt.plot(positions[:, 2], label="Position Z")
@@ -138,18 +151,79 @@ def plot_results(data, output_dir):
         plt.ylabel("Position (mm)")
         plt.legend()
 
-        plt.subplot(2, 1, 2)
+        plt.subplot(3, 1, 3)
         plt.plot(accelerations[:, 0], label="Acceleration X")
         plt.plot(accelerations[:, 1], label="Acceleration Y")
         plt.plot(accelerations[:, 2], label="Acceleration Z")
+        plt.axhline(
+            avg_acceleration[0], color="b", linestyle="--", label="Avg Acceleration X"
+        )
+        plt.axhline(
+            avg_acceleration[1],
+            color="#ffa500",
+            linestyle="--",
+            label="Avg Acceleration Y",
+        )
+        plt.axhline(
+            avg_acceleration[2], color="g", linestyle="--", label="Avg Acceleration Z"
+        )
         plt.title("Calculated Accelerations")
         plt.xlabel("Frame")
         plt.ylabel("Acceleration (mm/s^2)")
         plt.legend()
 
+        plt.subplot(3, 1, 2)
+        plt.plot(velocities[:, 0], label="Velocity X")
+        plt.plot(velocities[:, 1], label="Velocity Y")
+        plt.plot(velocities[:, 2], label="Velocity Z")
+        plt.title("Calculated Velocities")
+        plt.xlabel("Frame")
+        plt.ylabel("Velocity (mm/s)")
+        plt.legend()
+
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f"{repr(metadata)}.png"))
         plt.close()
+
+    with open(f"{output_dir}/accelerations.json", "w") as json_file:
+        json.dump(result_mapping, json_file, indent=4)
+
+    pot_values = []
+    avg_acc_y = []
+
+    for key, value in result_mapping.items():
+        pot_y = int(key[3:6])  # Extract Y potentiometer value
+        acc_y = float(value[1])  # Extract average Y acceleration
+        pot_values.append(pot_y)
+        avg_acc_y.append(acc_y)
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(pot_values, avg_acc_y, c="blue", marker="o")
+
+    fit = np.polyfit(pot_values, avg_acc_y, 1)
+    fit_fn = np.poly1d(fit)
+
+    line_equation = f"y = {fit[0]:.2f}x + {fit[1]:.2f}"
+    plt.text(
+        0.05,
+        0.95,
+        line_equation,
+        transform=plt.gca().transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"),
+    )
+
+    # Plot line of best fit
+    plt.plot(pot_values, fit_fn(pot_values), "r--", label="Best fit line")
+    plt.axvline(x=64, color="green", linestyle="--", label="pot_y = 64")
+
+    plt.title("Potentiometer Y Values vs. Average Y Acceleration")
+    plt.xlabel("Potentiometer Y Value")
+    plt.ylabel("Average Y Acceleration (mm/s^2)")
+    plt.grid(True)
+    plt.savefig(os.path.join(output_dir, "potentiometer_y_vs_acceleration_y.png"))
+    plt.close()
 
 
 # Main function

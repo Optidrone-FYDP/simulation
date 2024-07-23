@@ -8,7 +8,7 @@ We want to hold the potentiometer constant and from positions, infer acceleratio
 
 ```
 pip install poetry
-poetry run ingest.py
+poetry run python ingest.py
 ```
 
 # Style

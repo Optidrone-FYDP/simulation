@@ -4,8 +4,8 @@ import os
 
 """
 uses kinematic equations to calculate the new positions and velocities, and outputs final x y z position in mm:
-position is updated using formula: position_new[i] = position_old[i] + velocity[i] * duration + 0.5 * acceleration[i] * (duration^2)
-velocity is updated using formula: velocity_new[i] = velocity_old[i] + acceleration[i] * duration
+position is updated using formula: position_f[i] = position_i[i] + velocity[i] * duration + 0.5 * acceleration[i] * (duration^2)
+velocity is updated using formula: velocity_f[i] = velocity_i[i] + acceleration[i] * duration
 """
 
 

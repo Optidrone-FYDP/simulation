@@ -131,11 +131,12 @@ def plot_results(data, output_dir):
         avg_acceleration = np.mean(accelerations, axis=0)
 
         pot_key = f"{metadata.pot_x:03d}{metadata.pot_y:03d}{metadata.pot_z:03d}"
-        result_mapping[pot_key] = [
-            avg_acceleration[0],
-            avg_acceleration[1],
-            avg_acceleration[2],
-        ]
+        result_mapping[pot_key] = avg_acceleration[1]
+        # result_mapping[pot_key] = [
+        #     avg_acceleration[0],
+        #     avg_acceleration[1],
+        #     avg_acceleration[2],
+        # ]
 
         plt.figure(figsize=(12, 12))
 
@@ -192,8 +193,9 @@ def plot_results(data, output_dir):
     avg_acc_y = []
 
     for key, value in result_mapping.items():
-        pot_y = int(key[3:6])  # Extract Y potentiometer value
-        acc_y = float(value[1])  # Extract average Y acceleration
+        pot_y = int(key[3:6])
+        acc_y = float(value)
+        # acc_y = float(value[1])
         pot_values.append(pot_y)
         avg_acc_y.append(acc_y)
 

@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,10 +60,12 @@ def extract_position_data_from(
     df = pd.read_csv(
         file_path, skiprows=[0, 1, 2, 4], usecols=["Frame", "TX", "TY", "TZ"]
     )
-    df.set_index('Frame', inplace=True)
+    df.set_index("Frame", inplace=True)
 
     if interpolate:
-        df.interpolate(method='linear', inplace=True) # interpolate missing values-- csv sometimes has blank frames
+        df.interpolate(
+            method="linear", inplace=True
+        )  # interpolate missing values-- csv sometimes has blank frames
 
     if start_frame is not None and end_frame is not None and CUTOFF:
         df = df[start_frame:end_frame]
@@ -116,6 +119,8 @@ def plot_results(data, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    result_mapping = {}
+
     for trial in data:
         print(trial)
         positions = trial.positions
@@ -123,6 +128,14 @@ def plot_results(data, output_dir):
         metadata = trial.metadata
 
         accelerations, velocities = calculate_acceleration(positions, metadata.fps)
+        avg_acceleration = np.mean(accelerations, axis=0)
+
+        pot_key = f"{metadata.pot_x:03d}{metadata.pot_y:03d}{metadata.pot_z:03d}"
+        result_mapping[pot_key] = [
+            avg_acceleration[0],
+            avg_acceleration[1],
+            avg_acceleration[2],
+        ]
 
         plt.figure(figsize=(12, 12))
 
@@ -142,6 +155,15 @@ def plot_results(data, output_dir):
         plt.plot(accelerations[:, 0], label="Acceleration X")
         plt.plot(accelerations[:, 1], label="Acceleration Y")
         plt.plot(accelerations[:, 2], label="Acceleration Z")
+        plt.axhline(
+            avg_acceleration[0], color="b", linestyle="--", label="Avg Acceleration X"
+        )
+        plt.axhline(
+            avg_acceleration[1], color="#ffa500", linestyle="--", label="Avg Acceleration Y"
+        )
+        plt.axhline(
+            avg_acceleration[2], color="g", linestyle="--", label="Avg Acceleration Z"
+        )
         plt.title("Calculated Accelerations")
         plt.xlabel("Frame")
         plt.ylabel("Acceleration (mm/s^2)")
@@ -159,6 +181,9 @@ def plot_results(data, output_dir):
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, f"{repr(metadata)}.png"))
         plt.close()
+
+    with open(f"{output_dir}/accelerations.json", "w") as json_file:
+        json.dump(result_mapping, json_file, indent=4)
 
 
 # Main function

@@ -5,27 +5,20 @@ import torch, torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
 DATA_PATH = "processed_data"
-MODEL_SAVE_PATH = "drone_movement_model.pt"
-EPOCHS, BATCH_SIZE, LR = 20, 32, 1e-3
+MODEL_SAVE_PATH = "drone_movement_model_5k.pt"
+EPOCHS, BATCH_SIZE, LR = 5000, 32, 1e-3
 SEQ_LENGTH, HIDDEN_SIZE, NUM_LAYERS = 10, 64, 1
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 class DroneDataset(Dataset):
     def __init__(self, folder, _):
         files = sorted(glob.glob(os.path.join(folder, "*.csv")))
-        print(files)
-        dfs = [
-            pd.read_csv(f)[["Frame","RX", "RY", "RZ", "TX", "TY", "TZ", "potX", "potY", "potZ"]]
-            # .fillna({'potZ': 64}) #fill in missing values
-            .dropna(subset=["RX", "RY", "RZ", "TX", "TY", "TZ", "potX", "potY", "potZ"])
-            .values.astype(np.float32)
-            for f in files
-        ]
-        print(dfs[0][:10])
+        dfs = [ pd.read_csv(f).values.astype(np.float32) for f in files ]
         if dfs:
             self.data = np.concatenate(dfs, axis=0)
         else:
             self.data = np.empty((0, 9))
+        print(self.data)
 
     def __len__(self):
         return len(self.data) - SEQ_LENGTH if len(self.data) >= SEQ_LENGTH else 0 #non-negative

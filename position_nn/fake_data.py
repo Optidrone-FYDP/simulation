@@ -7,14 +7,14 @@ OUTPUT_PATH = "raw_data"
 
 def extract_pot_values(filename):
     parts = os.path.basename(filename).split('-')
-    potX = int(parts[3][1:])  # Extracts 'x064' -> 64
+    potX = int(parts[3][1:])  # extracts x064 -> 64
     potY = int(parts[4][1:])
     potZ = int(parts[5][1:])
     return potX, potY, potZ
 
 for file in glob.glob(os.path.join(DATA_PATH, "*.csv")):
     potX, potY, potZ = extract_pot_values(file)
-    df = pd.read_csv(file, skiprows=[0, 1, 2, 4])  # Skip the first 5 non-data rows
+    df = pd.read_csv(file, skiprows=[0, 1, 2, 4])  # non-data, non-header rows
     
     df = df[['Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ']]
     

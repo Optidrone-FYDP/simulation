@@ -25,7 +25,7 @@ uvx run ruff
 
 ## Running Scripts
 ```
-cd processed_data
+cd position_nn
 uv run process_data.py
 uv run train.py
 uv run predict.py <args>

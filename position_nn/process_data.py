@@ -79,19 +79,18 @@ def extract_data(file_path, start_frame, end_frame):
             "TX",
             "TY",
             "TZ",
-            "potX",
-            "potY",
-            "potZ",
         ],
     )
 
     df["Frame"] = pd.to_numeric(df["Frame"], errors="coerce")
+
     df.dropna(subset=["Frame"], inplace=True)
 
     # slice by start to end frame, if exists
     df = df[(df["Frame"] >= start_frame) & (df["Frame"] <= end_frame)]
     df.set_index("Frame", inplace=True)
 
+    print(df)
     return df
 
 

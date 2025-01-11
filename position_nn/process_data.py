@@ -89,8 +89,29 @@ def extract_data(file_path, start_frame, end_frame):
     # slice by start to end frame, if exists
     df = df[(df["Frame"] >= start_frame) & (df["Frame"] <= end_frame)]
     df.set_index("Frame", inplace=True)
+    return df
 
-    print(df)
+
+def extract_pot_data(file_path, start_frame, end_frame):
+    """
+    Remove metadata/subheaders from CSV
+    Retains the following columns: Frame, RX, RY, RZ, TX, TY, TZ, potX, potY, potZ
+    Filter data only to good rows
+    """
+    df = pd.read_csv(
+        file_path,
+        skiprows=[],
+        usecols=[
+            "timestamp",
+            "up/down pot",
+            "rotation pot",
+            "front/back pot",
+            "left/right pot",
+        ],
+    )
+
+    # this shouldnt even be needed
+    df = df.head(end_frame - start_frame + 1)
     return df
 
 
@@ -101,23 +122,70 @@ def process_data(data_dir, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    all_files = [f for f in os.listdir(data_dir) if f.endswith(".csv")]
+    # List all CSV files in the vicon directory
+    vicon_files = [
+        f for f in os.listdir(os.path.join(data_dir, "vicon")) if f.endswith(".csv")
+    ]
 
-    for file_name in all_files:
-        file_path = os.path.join(data_dir, file_name)
+    for vicon_file in vicon_files:
+        # Extract metadata from the vicon file name
+        metadata = extract_metadata_from(vicon_file)  # Custom function for metadata
 
-        metadata = extract_metadata_from(file_name)
+        # Construct the corresponding pot file name
+        pot_file = f"pot-{vicon_file}"
 
-        # read and filter CSV
-        df = extract_data(
-            file_path,
+        # Paths to vicon and pot files
+        vicon_file_path = os.path.join(data_dir, "vicon", vicon_file)
+        pot_file_path = os.path.join(data_dir, "pot", pot_file)
+
+        # Check if corresponding pot file exists
+        if not os.path.exists(pot_file_path):
+            print(f"Pot file missing for {vicon_file}. Skipping...")
+            continue
+
+        # Read and filter the vicon CSV
+        df1 = extract_data(
+            vicon_file_path,
             start_frame=metadata.start_frame,
             end_frame=metadata.end_frame,
         )
 
-        if df.empty:
-            print(f"no valid frames in {file_name}. Skipping-- does that seem right?")
+        # Read and filter the pot CSV
+        df2 = extract_pot_data(
+            pot_file_path,
+            start_frame=metadata.start_frame,
+            end_frame=metadata.end_frame,
+        )
+
+        # Merge the two DataFrames side by side
+        if len(df1) != len(df2):
+            print(
+                f"Row mismatch between vicon ({len(df1)}) and pot ({len(df2)}) data for {vicon_file}. Skipping..."
+            )
             continue
+
+        # Align the indices to avoid mismatches
+        df2 = df2.reset_index(drop=True)
+        df1 = df1.reset_index(drop=True)
+
+        # Concatenate the dataframes column-wise
+        df = pd.concat([df1, df2], axis=1)
+
+        # Reset the index to write a clean output
+        df.reset_index(drop=True, inplace=True)
+
+        # Merge the two DataFrames
+        # df = pd.concat([df1, df2], axis=1)
+        df = pd.concat([df1, df2.reset_index(drop=True)], axis=1)
+
+        # Reset the index to write a clean output
+        df.reset_index(inplace=True)
+
+        if df.empty:
+            print(f"No valid frames in {vicon_file}. Skipping...")
+            continue
+
+        print(df)
 
         out_name = f"{repr(metadata)}.csv"
         out_path = os.path.join(output_dir, out_name)

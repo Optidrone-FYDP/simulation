@@ -1,7 +1,7 @@
 Objects
 30
 ,,Global Angle drone_3:drone_3,,,,,,
-Frame,Sub Frame,RX,RY,RZ,TX,TY,TZ,potX,potY,potZ
+Frame,Sub Frame,RX,RY,RZ,TX,TY,TZ
 ,,rad,rad,rad,mm,mm,mm
 1,0,0.202035,0.201985,0.110196,13.5177,-1.53016,5.19155
 2,0,0.201694,0.201347,0.110104,13.5261,-1.52042,5.19166

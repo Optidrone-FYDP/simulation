@@ -15,7 +15,6 @@ def extract_pot_values(filename):
 for file in glob.glob(os.path.join(DATA_PATH, "*.csv")):
     potX, potY, potZ = extract_pot_values(file)
     df = pd.read_csv(file, skiprows=[0, 1, 2, 4])  # non-data, non-header rows
-    
     df = df[['Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ']]
     
     df['potX'] = potX

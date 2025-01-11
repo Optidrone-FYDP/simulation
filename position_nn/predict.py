@@ -29,7 +29,7 @@ def expand_pot_inputs(df):
     return np.array(sequence, dtype=np.float32)
 
 if len(sys.argv) != 8:
-    print(f"Usage: python {sys.argv[0]} <input_pots.csv> <start_RX> <start_RY> <start_RZ> <start_TX> <start_TY> <start_TZ>")
+    print(f"Usage: python {sys.argv[0]} <simulation_inputs.csv> <start_RX> <start_RY> <start_RZ> <start_TX> <start_TY> <start_TZ>")
     sys.exit(1)
 
 input_file = sys.argv[1]
@@ -40,7 +40,7 @@ expanded_sequence = expand_pot_inputs(df_input)
 total_frames = len(expanded_sequence)
 
 model = DroneMovementModel().to(DEVICE)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True))
 model.eval()
 
 current_position = np.array([start_RX, start_RY, start_RZ, start_TX, start_TY, start_TZ], dtype=np.float32)

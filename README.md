@@ -30,6 +30,10 @@ uv run process_data.py
 uv run train.py
 uv run predict.py <args>
 ```
+For example: 
+```
+uv run predict.py simulation.csv 0 0 0 0 0 0
+```
 
 WIP: args, functionality
 

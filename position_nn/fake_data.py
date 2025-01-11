@@ -15,13 +15,13 @@ def extract_pot_values(filename):
 for file in glob.glob(os.path.join(DATA_PATH, "*.csv")):
     potX, potY, potZ = extract_pot_values(file)
     df = pd.read_csv(file, skiprows=[0, 1, 2, 4])  # non-data, non-header rows
-    df = df[['Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ']]
+    df = df[['Frame', 'Sub Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ']]
     
     df['potX'] = potX
     df['potY'] = potY
     df['potZ'] = potZ
     
-    df = df[['Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ', 'potX', 'potY', 'potZ']]
+    df = df[['Frame', 'Sub Frame', 'RX', 'RY', 'RZ', 'TX', 'TY', 'TZ', 'potX', 'potY', 'potZ']]
     
     parts = os.path.basename(file).split('-')
     new_filename = '-'.join(parts[:3] + parts[6:])

@@ -68,6 +68,9 @@ def extract_data(file_path, start_frame, end_frame):
     Retains the following columns: Frame, RX, RY, RZ, TX, TY, TZ, potX, potY, potZ
     Filter data only to good rows
     """
+    df = pd.read_csv(file_path, skiprows=[0, 1, 2, 4],)
+    print(df[:10])
+
     df = pd.read_csv(
         file_path,
         skiprows=[0, 1, 2, 4],  # these rows do not contain data. Row 4 is header
@@ -91,6 +94,7 @@ def extract_data(file_path, start_frame, end_frame):
     df.set_index("Frame", inplace=True)
     return df
 
+<<<<<<< Updated upstream
 
 def extract_pot_data(file_path, start_frame, end_frame):
     """
@@ -112,6 +116,10 @@ def extract_pot_data(file_path, start_frame, end_frame):
 
     # this shouldnt even be needed
     df = df.head(end_frame - start_frame + 1)
+=======
+    print(df[:10])
+
+>>>>>>> Stashed changes
     return df
 
 

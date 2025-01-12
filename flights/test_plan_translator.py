@@ -2,7 +2,8 @@ import csv
 import json
 import os
 
-POSTION_NN_DIR = "../position_nn"
+POSTION_NN_DIR = "plans"
+FILE_NAME = "03_circle"
 
 
 def expand_values(value, duration):
@@ -20,10 +21,10 @@ def convert_csv_to_json(input_csv, output_json):
             for row in csv_reader:
                 duration = int(row["duration"])
 
-                result["ud"].extend(expand_values(int(row["potX"]), duration))
+                result["ud"].extend(expand_values(int(row["potZ"]), duration))
                 result["rt"].extend(expand_values(int(row["potRot"]), duration))
                 result["fb"].extend(expand_values(int(row["potY"]), duration))
-                result["lr"].extend(expand_values(int(row["potZ"]), duration))
+                result["lr"].extend(expand_values(int(row["potX"]), duration))
 
         with open(output_json, "w") as json_file:
             json.dump(result, json_file, indent=4)
@@ -42,8 +43,8 @@ def convert_csv_to_json(input_csv, output_json):
 
 os.makedirs(POSTION_NN_DIR, exist_ok=True)
 
-input_csv = os.path.join(POSTION_NN_DIR, "simulation.csv")
-output_json = os.path.join("plans", "simulation_input.json")
+input_csv = os.path.join(POSTION_NN_DIR, FILE_NAME + ".csv")
+output_json = os.path.join("plans", FILE_NAME + ".json")
 
 if not os.path.exists(output_json):
     with open(output_json, "w") as f:

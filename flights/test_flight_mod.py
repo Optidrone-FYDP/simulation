@@ -30,7 +30,7 @@ def start_flight():
         UART_PORT.write(bytes.fromhex("34"))
 
 def start_routine():
-    plan_name = plan_name_strvar.get() + ".csv"
+    plan_name = flight_plan_var.get() + ".csv"
     plan_file = os.path.join("plans", plan_name)
 
     # print(plan_file)
@@ -247,6 +247,7 @@ refresh_btn.grid(row=0, column=2, padx=5, pady=5)
 
 refresh_flight_plans()
 
+# Control Variables Frame
 control_vars_frame = tk.Frame(root)
 control_vars_frame.pack(pady=10)
 

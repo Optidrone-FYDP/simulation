@@ -195,6 +195,12 @@ def joy_status():
 # # Run the GUI
 # root.mainloop()
 
+import threading
+
+def start_routine_threaded():
+    thread = threading.Thread(target=start_routine)
+    thread.start()
+
 def refresh_flight_plans():
     flight_plans = [f for f in os.listdir("plans") if f.endswith(".csv")]
     flight_plan_menu['menu'].delete(0, 'end')
@@ -209,7 +215,6 @@ root = tk.Tk()
 root.title("OptiDrone Test Flight Controls")
 root.geometry("400x500")
 
-# Status Frame
 status_frame = tk.Frame(root)
 status_frame.pack(pady=10)
 
@@ -226,7 +231,6 @@ controller_val.grid(row=0, column=1, padx=5, pady=5, sticky='w')
 flight_lbl.grid(row=1, column=0, padx=5, pady=5, sticky='e')
 flight_val.grid(row=1, column=1, padx=5, pady=5, sticky='w')
 
-# Flight Plan Frame
 plan_frame = tk.Frame(root)
 plan_frame.pack(pady=10)
 
@@ -243,7 +247,6 @@ refresh_btn.grid(row=0, column=2, padx=5, pady=5)
 
 refresh_flight_plans()
 
-# Control Variables Frame
 control_vars_frame = tk.Frame(root)
 control_vars_frame.pack(pady=10)
 
@@ -266,7 +269,6 @@ left_right_entry.grid(row=1, column=1, padx=5, pady=5)
 forward_backward_lbl.grid(row=2, column=0, padx=5, pady=5, sticky='e')
 forward_backward_entry.grid(row=2, column=1, padx=5, pady=5)
 
-# Buttons Frame
 buttons_frame = tk.Frame(root)
 buttons_frame.pack(pady=20)
 

@@ -130,11 +130,11 @@ def joy_status():
         status.append(val)
     return status
 
-def clear_entries():
-    up_down_intvar.set(64)
-    left_right_intvar.set(64)
-    forward_backward_intvar.set(64)
-    plan_name_strvar.set("")
+# def clear_entries():
+#     up_down_intvar.set(64)
+#     left_right_intvar.set(64)
+#     forward_backward_intvar.set(64)
+#     plan_name_strvar.set("")
 
 # GUI
 

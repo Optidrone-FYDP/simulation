@@ -9,7 +9,6 @@
 **60 - 69:**: Limited step random walk
 
 
-
 ### Model
 
 1. LSTM

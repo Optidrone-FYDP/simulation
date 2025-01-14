@@ -40,7 +40,7 @@ class Serial:
             self.real_serial.close()
             print("[Serial] Real serial port closed.")
 
-MOCK = True
+MOCK = False
 PORT = "COM5"
 FPS = 30
 UART_PORT = Serial(PORT, 9600, 5, mock=MOCK)

@@ -4,7 +4,7 @@ import time
 import json
 import pandas as pd
 
-uart_port = serial.Serial("COM3", 9600, timeout=5)
+uart_port = serial.Serial("COM5", 9600, timeout=5)
 fps = 30
 
 def hex_helper(int_in):

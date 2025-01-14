@@ -40,7 +40,7 @@ class Serial:
             self.real_serial.close()
             print("[Serial] Real serial port closed.")
 
-MOCK = True
+MOCK = False
 PORT = "COM5"
 FPS = 30
 UART_PORT = Serial(PORT, 9600, 5, mock=MOCK)
@@ -244,16 +244,16 @@ buttons_frame.pack(pady=20)
 
 controller_on_btn = tk.Button(buttons_frame, text="Controller On/Off", command=controller_on, width=20)
 start_flight_btn = tk.Button(buttons_frame, text="Takeoff", command=start_flight, width=20)
-update_flight_btn = tk.Button(buttons_frame, text="Update Flight", command=update_flight, width=20)
 fly_routine_btn = tk.Button(buttons_frame, text="Fly Routine", command=start_routine, width=20)
 land_btn = tk.Button(buttons_frame, text="Land", command=land, width=20)
+update_flight_btn = tk.Button(buttons_frame, text="Update Flight", command=update_flight, width=20)
 get_state_btn = tk.Button(buttons_frame, text="Get Joystick States", command=joy_status, width=20)
 
 controller_on_btn.pack(pady=5)
 start_flight_btn.pack(pady=5)
-update_flight_btn.pack(pady=5)
 fly_routine_btn.pack(pady=5)
 land_btn.pack(pady=5)
+update_flight_btn.pack(pady=5)
 get_state_btn.pack(pady=5)
 
 root.mainloop()

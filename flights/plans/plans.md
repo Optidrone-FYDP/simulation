@@ -7,3 +7,23 @@
 **40 - 49:**: Eliptical and circular motion
 **50 - 59:**: Takeoff/landing
 **60 - 69:**: Limited step random walk
+
+
+
+### Model
+
+1. LSTM
+2. NARX
+
+Inputs:
+
+- Potentiometer inputs (x,y,z,rot)
+- Position inputs (x,y,z)
+- Pitch, roll, yaw
+
+Inferred:
+- Velocity/Acceleration
+
+Outputs:
+- Position and pitch, roll, yaw
+

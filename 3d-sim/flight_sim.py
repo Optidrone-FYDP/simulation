@@ -1,11 +1,15 @@
 # Following libraries required:
-# pip install PyOpenGL PyQt5 numpy
+# pip install PyOpenGL PyQt5 numpy pyqtgraph numpy-stl
 
 import sys
 import math
+import numpy as np
+import itertools
+import pyqtgraph.opengl as gl
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QPushButton
 from PyQt5.QtOpenGL import QGLWidget
 from OpenGL.GL import *
+from stl import mesh
 
 class GLWidget(QGLWidget):
     def __init__(self, parent=None):
@@ -102,6 +106,34 @@ class GLWidget(QGLWidget):
     def timerEvent(self, event):
         self.update()
 
+def create_cube():
+    vertexes = np.array(list(itertools.product(range(2),repeat=3)))
+
+    faces = []
+
+    for i in range(2):
+        temp = np.where(vertexes==i)
+        for j in range(3):
+            temp2 = temp[0][np.where(temp[1]==j)]
+            for k in range(2):
+                faces.append([temp2[0],temp2[1+k],temp2[3]])
+
+    faces = np.array(faces)
+
+    colors = np.array([[1,0,0,1] for i in range(12)])
+
+    cube = gl.GLMeshItem(vertexes=vertexes, faces=faces, faceColors=colors,
+                        drawEdges=True, edgeColor=(0, 0, 0, 1))
+
+    return cube
+
+def load_drone():
+    filename = "stl_files\\uploads_files_4318187_Drone.stl"
+    m = mesh.Mesh.from_file(filename)
+    shape = m.points.shape
+    points = m.points.reshape(-1, 3)
+    faces = np.arange(points.shape[0]).reshape(-1, 3)
+    return points, faces
 
 # Main GUI
 
@@ -120,8 +152,28 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
 
-        self.glWidget = GLWidget()
-        layout.addWidget(self.glWidget)
+        # self.glWidget = GLWidget()
+        # layout.addWidget(self.glWidget)
+
+        self.viewer = gl.GLViewWidget()
+        layout.addWidget(self.viewer)
+
+        self.glGrid = gl.GLGridItem()
+        self.glGrid.setSize(200, 200)
+        self.glGrid.setSpacing(5, 5)
+        self.viewer.addItem(self.glGrid)
+
+        # cube = create_cube()
+        # self.viewer.addItem(cube)
+
+        drone_points, drone_faces = load_drone()
+        meshdata = gl.MeshData(vertexes=drone_points, faces=drone_faces)
+        self.mesh = gl.GLMeshItem(meshdata=meshdata, smooth=True, drawFaces=False, drawEdges=True, edgeColor=(0, 1, 0, 1))
+        self.viewer.addItem(self.mesh)
+
+        self.glAxes = gl.GLAxisItem()
+        self.glAxes.setSize(100, 100, 100)
+        self.viewer.addItem(self.glAxes)
 
         btn_start_stop = QPushButton('Start/Stop', self)
         btn_start_stop.clicked.connect(self.start_flight)
@@ -136,17 +188,24 @@ class MainWindow(QMainWindow):
     def start_flight(self):
         if self.animation_running:
             print('Stopping animation...')
-            self.glWidget.killTimer(self.glWidget.timer)
+            # self.glWidget.killTimer(self.glWidget.timer)
             self.animation_running = False
         else:
             print('Starting animation...')
-            self.glWidget.timer = self.glWidget.startTimer(50)  # Timer for animation
+            # self.glWidget.timer = self.glWidget.startTimer(50)  # Timer for animation
             self.animation_running = True
+            # while(self.animation_running):
+            #     mesh.resetTransform()
+            #     mesh.translate(10, 0, 0)
+
+            while(1):
+                self.mesh.translate(0.1,0,0)
+                app.processEvents()
 
     def reset_flight(self):
         print('Resetting animation...')
         if self.animation_running:
-            self.glWidget.killTimer(self.glWidget.timer)
+            # self.glWidget.killTimer(self.glWidget.timer)
             self.animation_running = False
 
         self.glWidget.resetGL()

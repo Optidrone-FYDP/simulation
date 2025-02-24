@@ -1,5 +1,4 @@
 potX,potY,potZ,potRot,duration
-//changed from 10 but still will crash the drone so 5 frames for testing
 104,64,64,80,5
 103,67,64,80,5
 101,71,64,80,5

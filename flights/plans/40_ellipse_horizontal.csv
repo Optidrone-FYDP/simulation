@@ -1,4 +1,3 @@
-// used to be 10 frames but will crash the drone so 3 frames for testing
 potX,potY,potZ,potRot,duration
 104,64,64,80,3
 103,67,64,80,3

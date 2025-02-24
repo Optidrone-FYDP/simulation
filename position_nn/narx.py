@@ -10,179 +10,187 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPRegressor
+from scipy.ndimage import gaussian_filter1d
 
 
 def load_training_data(folder):
-    """
-    Load all CSV files from a folder and merge them into a single DataFrame.
-    This is useful when your training data is spread across multiple files.
-    """
+    # loads all csv files from a folder and combines them into one dataframe
+    # useful when training data is spread across multiple files
     all_dfs = []
-    for f in sorted(glob.glob(os.path.join(folder, "*.csv"))):  # Find all CSV files
+    for f in sorted(glob.glob(os.path.join(folder, "*.csv"))):  # find all csv files
         df = pd.read_csv(f)
         all_dfs.append(df)
-    return pd.concat(all_dfs, ignore_index=True)  # Merge all data
+    return pd.concat(all_dfs, ignore_index=True)  # merge all data
 
 
 def make_narx_features(X, Y, x_lag=4, y_lag=4):
-    """
-    Create lagged features for a NARX model.
-    Basically, we are adding past values of inputs (X) and outputs (Y)
-    as new columns to help the model learn relationships over time.
-    """
+    # creates lagged features for a narx model (nonlinear autoregressive with exogenous inputs)
+    # adds past values of inputs (X) and outputs (Y) as new columns to help the model learn patterns over time
     N = len(X)
-    m = max(x_lag, y_lag)  # The largest lag determines how much we trim
+    m = max(x_lag, y_lag)  # the largest lag determines how much we trim
     cols = []
 
-    # Add past input values
+    # add past input values
     for lag in range(1, x_lag + 1):
-        cols.append(X[lag:])
+        if lag < len(X):
+            cols.append(X[lag:])
 
-    # Add past output values
+    # add past output values
     for lag in range(1, y_lag + 1):
-        cols.append(Y[lag:])
+        if lag < len(Y):
+            cols.append(Y[lag:])
 
-    # Trim all arrays to the same length before stacking
-    trimmed = [c[len(c) - (N - m) :] for c in cols]
+    # trim all arrays to match in length
+    trimmed = [c[: (N - m)] for c in cols]
+    features = np.column_stack(trimmed)
+    targets = Y[m:]
 
-    return np.hstack(trimmed), Y[m:]
+    return features, targets
+
+
+def safe_log(x):
+    # apply log transform while handling zeros and negative values
+    # log normally can't handle negatives, so we take the absolute value first
+    # we also use log1p(x) instead of log(x) to prevent issues when x is close to zero
+    # sign is preserved so negative values don’t just disappear
+    return np.sign(x) * np.log1p(np.abs(x))
+
+
+def inverse_safe_log(x):
+    # reverses the safe_log transformation
+    # since we used log1p (which is log(1 + x)), we do exp(x) - 1 to undo it
+    # sign is restored so negative numbers go back to their original values
+    return np.sign(x) * (np.exp(np.abs(x)) - 1)
 
 
 def narx_closed_loop_predict(
-    model, x_scaler, y_scaler, X_full, init_y, x_lag=4, y_lag=4
+    model, x_scaler, y_scaler, X_full, init_y, x_lag=10, y_lag=10
 ):
-    """
-    Predict future values using a closed-loop approach.
-    This means that after predicting a value, we feed it back into the model
-    as input for the next prediction (like a chain reaction).
-    """
-    N, d = len(X_full), init_y.shape[1]  # Number of data points and output dimensions
-    preds = np.zeros((N, d))  # Store predictions
-    preds[:y_lag] = init_y[:y_lag]  # Fill in the first few rows with initial values
+    # closed-loop prediction: the model predicts one step, then uses its own output as input for the next step
+    # instead of predicting absolute values, we predict delta changes over time
+    # using deltas helps keep the system stable and prevents drift
+    N, d = len(X_full), init_y.shape[1]
+    preds = np.zeros((N, d))  # store predictions
+    preds[:y_lag] = init_y[:y_lag]  # initialize with known values
 
     for k in range(y_lag, N):
-        # Get previous `x_lag` inputs
-        lx = [X_full[k - lag] for lag in range(1, x_lag + 1)]
-        # Get previous `y_lag` outputs (which we are predicting)
-        ly = [preds[k - lag] for lag in range(1, y_lag + 1)]
-        f = np.hstack(lx + ly).reshape(1, -1)  # Stack and reshape for the model
+        x_features = []
+        for lag in range(1, x_lag + 1):
+            if k - lag >= 0:
+                x_features.append(X_full[k - lag])  # past input states
+            else:
+                x_features.append(
+                    np.zeros_like(X_full[0])
+                )  # zero padding for early steps
 
-        # Scale the features and predict
+        y_features = []
+        for lag in range(1, y_lag + 1):
+            if k - lag >= 0:
+                y_features.append(
+                    preds[k - lag] - preds[k - lag - 1]
+                )  # past output deltas
+            else:
+                y_features.append(np.zeros(d))  # zero padding
+
+        f = np.hstack(x_features + y_features).reshape(1, -1)
         fs = x_scaler.transform(f)
-        ps = model.predict(fs)
+        delta_pred = y_scaler.inverse_transform(model.predict(fs))[0]
 
-        # Transform the prediction back to the original scale
-        preds[k] = y_scaler.inverse_transform(ps)[0]
+        # compute next step using the last known state and predicted change
+        preds[k] = preds[k - 1] + delta_pred
 
     return preds
 
 
-# Make sure the script is run with the correct arguments
+# check command-line arguments
 if len(sys.argv) != 3:
-    print(f"Usage: {sys.argv[0]} <training_folder> <simulation_input.csv>")
+    print(f"usage: {sys.argv[0]} <training_folder> <simulation_input.csv>")
     sys.exit(1)
 
-# Load training data
 training_folder = sys.argv[1]
 sim_input_file = sys.argv[2]
-print("Loading training data...")
+
+print("loading training data...")
 df_train = load_training_data(training_folder)
 
-# Select relevant columns (inputs and outputs)
-Xf = df_train[["potX", "potY", "potZ"]].values.astype(np.float64)  # Inputs
-Yf = df_train[["Frame", "RX", "RY", "RZ", "TX", "TY", "TZ"]].values.astype(
-    np.float64
-)  # Outputs
+# extract input and output variables
+Xf = df_train[["potX", "potY", "potZ"]].values.astype(np.float64)
+Yf = df_train[["RX", "RY", "RZ", "TX", "TY", "TZ"]].values.astype(np.float64)
 
-# Generate features for training using past values (NARX-style)
-print("Generating NARX features...")
-X_narx, Y_narx = make_narx_features(Xf, Yf)
+print(f"xf shape: {Xf.shape}, yf shape: {Yf.shape}")
 
-# Split into training and testing sets
+# compute delta changes (instead of absolute values)
+delta_Yf = np.diff(Yf, axis=0)
+delta_Yf = np.vstack([np.zeros(Yf.shape[1]), delta_Yf])
+
+print(f"delta yf shape: {delta_Yf.shape}")
+
+# generate narx-style input-output pairs
+X_narx, Y_narx = make_narx_features(Xf, delta_Yf, x_lag=10, y_lag=10)
+
+# train-test split & scaling
 X_train, X_test, y_train, y_test = train_test_split(
     X_narx, Y_narx, test_size=0.2, random_state=42
 )
-
-# Standardize the data (important for neural networks)
-print("Scaling features...")
 xs, ys = StandardScaler(), StandardScaler()
 X_train_s, X_test_s = xs.fit_transform(X_train), xs.transform(X_test)
 y_train_s, y_test_s = ys.fit_transform(y_train), ys.transform(y_test)
 
-# Define and train a simple neural network
-print("Training model...")
+print("training model...")
 mdl = MLPRegressor(
-    hidden_layer_sizes=(256, 256, 256),  # Three hidden layers with 256 neurons each
-    activation="tanh",  # Activation function
-    solver="adam",  # Optimization algorithm
-    max_iter=500,  # Number of training iterations
+    hidden_layer_sizes=(32, 16),  # moderate complexity
+    activation="relu",
+    solver="adam",
+    max_iter=500,
+    learning_rate_init=0.001,
+    tol=1e-4,
+    early_stopping=True,
+    validation_fraction=0.2,
+    n_iter_no_change=10,
+    alpha=0.008,  # regularization to reduce overfitting
     random_state=42,
+    batch_size=32,
 )
 mdl.fit(X_train_s, y_train_s)
 
-# Save the trained model
 torch.save((mdl, xs, ys), "narx_model.pth")
-print("Model trained and saved as narx_model.pth!")
+print("model saved!")
 
-# Load simulation input data
-print("Loading simulation input...")
+# load simulation data & expand based on duration column
+print("loading simulation input...")
 df_sim_input = pd.read_csv(sim_input_file)
-
-# Expand input rows based on duration column
-expanded_rows = []
-for _, row in df_sim_input.iterrows():
-    for _ in range(int(row["duration"])):
-        expanded_rows.append([row["potX"], row["potY"], row["potZ"]])
+expanded_rows = [
+    [row["potX"], row["potY"], row["potZ"]]
+    for _, row in df_sim_input.iterrows()
+    for _ in range(int(row["duration"]))
+]
 X_sim = np.array(expanded_rows, dtype=np.float64)
 
-# Generate predictions
-print("Generating predictions...")
-init_y = np.zeros((4, 7))  # Initial conditions for the feedback loop
-raw_preds = narx_closed_loop_predict(mdl, xs, ys, X_sim, init_y)
+init_y = np.zeros((10, 6))
+raw_preds = narx_closed_loop_predict(mdl, xs, ys, X_sim, init_y, x_lag=10, y_lag=10)
 
 
-# Apply smoothing to reduce noise in predictions
+# apply simple smoothing to reduce noise
 def smooth_predictions(predictions, window):
     return np.convolve(predictions, np.ones(window) / window, mode="same")
 
 
-preds = np.apply_along_axis(lambda x: smooth_predictions(x, 9), axis=0, arr=raw_preds)
+preds = np.apply_along_axis(lambda x: smooth_predictions(x, 5), axis=0, arr=raw_preds)
 
-# Save predictions
-df_pred = pd.DataFrame(preds, columns=["Frame", "RX", "RY", "RZ", "TX", "TY", "TZ"])
-if "Frame" in df_pred.columns:
-    df_pred.drop(columns=["Frame"], inplace=True)
-
+df_pred = pd.DataFrame(preds, columns=["RX", "RY", "RZ", "TX", "TY", "TZ"])
 df_pred.insert(0, "Frame", range(1, len(df_pred) + 1))
 df_pred.to_csv("narx_predictions.csv", index=False)
-print("Predictions saved to narx_predictions.csv!")
 
-# Compute velocity and acceleration
+print("predictions saved!")
+
+# compute velocity & acceleration
 df_pred[["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]] = (
-    df_pred[["RX", "RY", "RZ", "TX", "TY", "TZ"]].diff().fillna(0)
+    df_pred.iloc[:, 1:7].diff().fillna(0)
 )
 df_pred[["A_RX", "A_RY", "A_RZ", "A_TX", "A_TY", "A_TZ"]] = (
-    df_pred[["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]].diff().fillna(0)
+    df_pred.iloc[:, 7:].diff().fillna(0)
 )
 
-# Plot results
-print("Generating plots...")
-fig, axs = plt.subplots(3, 1, figsize=(12, 15))
-for label in ["RX", "RY", "RZ", "TX", "TY", "TZ"]:
-    axs[0].plot(df_pred["Frame"], df_pred[label], label=label)
-axs[0].set_title("Position Over Time")
-axs[0].legend()
-
-for label in ["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]:
-    axs[1].plot(df_pred["Frame"], df_pred[label], label=label)
-axs[1].set_title("Velocity Over Time")
-axs[1].legend()
-
-for label in ["A_RX", "A_RY", "A_RZ", "A_TX", "A_TY", "A_TZ"]:
-    axs[2].plot(df_pred["Frame"], df_pred[label], label=label)
-axs[2].set_title("Acceleration Over Time")
-axs[2].legend()
-
-plt.tight_layout()
+# save plots
 plt.savefig("narx_predictions.png")
-print("Plots saved as narx_predictions.png!")
+print("plots saved!")

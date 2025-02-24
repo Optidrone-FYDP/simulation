@@ -49,16 +49,6 @@ def make_narx_features(X, Y, x_lag=4, y_lag=4):
     return features, targets
 
 
-def safe_log(x):
-    # avoids log issues by adding a small constant and preserving the sign
-    return np.sign(x) * np.log1p(np.abs(x))
-
-
-def inverse_safe_log(x):
-    # inverse function to recover original values
-    return np.sign(x) * (np.exp(np.abs(x)) - 1)
-
-
 def narx_closed_loop_predict(
     model, x_scaler, y_scaler, X_full, init_y, x_lag=10, y_lag=10
 ):
@@ -136,22 +126,21 @@ xs, ys = StandardScaler(), StandardScaler()
 X_train_s, X_test_s = xs.fit_transform(X_train), xs.transform(X_test)
 y_train_s, y_test_s = ys.fit_transform(y_train), ys.transform(y_test)
 
-# training an mlp regressor with relu activation
 print("Training model...")
 mdl = MLPRegressor(
-    hidden_layer_sizes=(32, 16),  # two-layer network with 32 and 16 nodes
+    hidden_layer_sizes=(32, 16),
     activation="relu",
     solver="adam",
-    max_iter=500,  # increased iterations to improve training
+    max_iter=500,
     learning_rate="constant",
-    learning_rate_init=0.001,  # standard learning rate
-    tol=1e-4,  # stop training when improvement is below this threshold
-    early_stopping=True,  # stop early if no improvement
-    validation_fraction=0.2,  # 20% of training data used for validation
-    n_iter_no_change=10,  # stop after 10 iterations with no improvement
-    alpha=0.008,  # l2 regularization to prevent overfitting
+    learning_rate_init=0.001,
+    tol=1e-4,
+    early_stopping=True,
+    validation_fraction=0.2,
+    n_iter_no_change=10,
+    alpha=0.008,
     random_state=42,
-    batch_size=32,  # small batch size to balance training speed and stability
+    batch_size=32,
 )
 mdl.fit(X_train_s, y_train_s)
 
@@ -159,18 +148,15 @@ mdl.fit(X_train_s, y_train_s)
 torch.save((mdl, xs, ys), "narx_model.pth")
 print("Model trained and saved as narx_model.pth!")
 
-# load simulation input data
 print("Loading simulation input...")
 df_sim_input = pd.read_csv(sim_input_file)
 
-# expand input rows based on duration column (repeat each row based on duration value)
 expanded_rows = []
 for _, row in df_sim_input.iterrows():
     for _ in range(int(row["duration"])):
         expanded_rows.append([row["potX"], row["potY"], row["potZ"]])
 X_sim = np.array(expanded_rows, dtype=np.float64)
 
-# initialize predictions with zeros for the first 10 frames
 init_y = np.zeros((10, 6))
 raw_preds = narx_closed_loop_predict(mdl, xs, ys, X_sim, init_y, x_lag=10, y_lag=10)
 
@@ -178,7 +164,6 @@ print(f"Raw predictions shape: {raw_preds.shape}")
 
 
 def smooth_predictions(predictions, window):
-    # simple moving average smoothing
     return np.convolve(predictions, np.ones(window) / window, mode="same")
 
 
@@ -190,3 +175,34 @@ df_pred = pd.DataFrame(preds, columns=["RX", "RY", "RZ", "TX", "TY", "TZ"])
 df_pred.insert(0, "Frame", range(1, len(df_pred) + 1))
 df_pred.to_csv("narx_predictions.csv", index=False)
 print("Predictions saved to narx_predictions.csv!")
+
+# compute velocity and acceleration
+df_pred[["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]] = (
+    df_pred[["RX", "RY", "RZ", "TX", "TY", "TZ"]].diff().fillna(0)
+)
+df_pred[["A_RX", "A_RY", "A_RZ", "A_TX", "A_TY", "A_TZ"]] = (
+    df_pred[["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]].diff().fillna(0)
+)
+
+# generate plots
+print("Generating plots...")
+fig, axs = plt.subplots(3, 1, figsize=(12, 15))
+
+for label in ["RX", "RY", "RZ", "TX", "TY", "TZ"]:
+    axs[0].plot(df_pred["Frame"], df_pred[label], label=label)
+axs[0].set_title("Position Over Time")
+axs[0].legend()
+
+for label in ["V_RX", "V_RY", "V_RZ", "V_TX", "V_TY", "V_TZ"]:
+    axs[1].plot(df_pred["Frame"], df_pred[label], label=label)
+axs[1].set_title("Velocity Over Time")
+axs[1].legend()
+
+for label in ["A_RX", "A_RY", "A_RZ", "A_TX", "A_TY", "A_TZ"]:
+    axs[2].plot(df_pred["Frame"], df_pred[label], label=label)
+axs[2].set_title("Acceleration Over Time")
+axs[2].legend()
+
+plt.tight_layout()
+plt.savefig("narx_predictions.png")
+print("Plots saved as narx_predictions.png!")

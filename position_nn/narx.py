@@ -184,6 +184,5 @@ axs[2].set_title("Acceleration Over Time")
 axs[2].legend()
 
 plt.tight_layout()
-plt.savefig("narx_plot.png")
-plt.show()
-print("Plots saved as narx_plot.png!")
+plt.savefig("narx_predictions.png")
+print("Plots saved as narx_predictions.png!")

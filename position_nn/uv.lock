@@ -678,7 +678,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "pandas" },
-    { name = "pyneurgen" },
     { name = "torch" },
 ]
 
@@ -686,15 +685,8 @@ dependencies = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pyneurgen", specifier = ">=0.3.1" },
     { name = "torch", specifier = ">=2.5.1" },
 ]
-
-[[package]]
-name = "pyneurgen"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/df/3a/21a7d310c3acb28c9a26b0a78a6b52d7ee00294ad19f65735dd4e8a6a887/pyneurgen-0.3.1.tar.gz", hash = "sha256:511b50f9039e40cbd65ea60a210761030d6ad3518eccde451d264991a99fe2a9", size = 581386 }
 
 [[package]]
 name = "pyparsing"

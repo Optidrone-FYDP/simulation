@@ -1,4 +1,4 @@
-level_0,index,RX,RY,RZ,TX,TY,TZ,timestamp,up/down pot,rotation pot,front/back pot,left/right pot
+level_0,index,RX,RY,RZ,TX,TY,TZ,timestamp,potZ,potRot,potX,potY
 0,0,-0.0141636,0.0556356,0.0687881,-720.071,204.679,1367.06,0.0,b'1',b' ',b'r',b'e'
 1,1,-0.0153178,0.0552944,0.0685757,-725.709,217.707,1358.24,0.0306968688964843,b'e',b'i',b'v',b'e'
 2,2,-0.0165013,0.05615,0.0678868,-730.842,231.769,1349.29,0.044621467590332,b'\r',b'\n',b'1',b' '

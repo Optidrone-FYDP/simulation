@@ -30,41 +30,49 @@ class dronePID:
         self.setpoint_step = 0
         self.current_time = 0
         self.last_time = 0
-        self.state = "hover" # or "follow"
+        self.state = ["hover", "hover", "hover"] # or "follow" or "wait"
         self.imm_target = [0,0]
     
     def setpoint(self, x_pos, y_pos, z_pos, rot):
         self.target_pos = [x_pos, y_pos, z_pos, rot]
         self.profiled_path = profile(self.target_pos)
         self.setpoint_step = -1
-        self.state = "follow"
+        for i in len(self.state):
+            self.state[i] = "follow"
         next_setpoint()
 
-    def next_setpoint(self):
-        if self.state == "follow":
+    def next_setpoint(self, axis):
+        if self.state[axis] == "follow":
+            self.state[axis] = "wait"
+            if "follow" in self.state:
+                return
             self.setpoint_step += 1
             if self.setpoint_step >= len(self.profiled_path):
-                self.state == "hover"
+                for i in len(self.state):
+                    self.state[i] = "hover"
             else:
+                for i in len(self.state):
+                    self.state[i] = "follow"
                 self.imm_target[0] = self.profiled_path[self.stepoint_step][0][0]
                 self.target_acc[0] = self.profiled_path[self.setpoint_step][0][1]
                 self.imm_target[1] = self.profiled_path[self.stepoint_step][1][0]
                 self.target_acc[1] = self.profiled_path[self.setpoint_step][1][1]
+                self.imm_target[2] = self.profiled_path[self.setpoint_step][2]
     
-    def profile(self, target_pos):  # only x-y plane is profiled as z and rot have special cases
+    def profile(self, target_pos):  # only x-y plane, z is semi-profiled only a target pos is provided, rot have special case so it's not profiled
         # math to calculate profiled accelerations
         out = []
         total_dist = math.sqrt( (target_pos[0]-self.current_pos[0])**2 + (target_pos[1]-self.current_pos[1])**2 )
         self.travel_time = 2 + 0.01*total_dist/3
         self.accel_time = self.travel_time/2
         self.accel = [ (target_pos[0]-self.current_pos[0])/(self.accel_time**2), (target_pos[1]-self.current_pos[1])/(self.accel_time**2) ]
-        s1 = [ [ (target_pos[0]-self.current_pos[0])/2 + self.current_pos[0], self.accel[0] ] , [ (target_pos[1]-self.current_pos[1])/2 + self.current_pos[1], self.accel[1] ] ]    # format is : [position, acceleration]
-        s2 = [ [ target_pos[0], -self.accel[0] ], [ target_pos[1], -self.accel[1] ] ]
+        s1 = [ [ (target_pos[0]-self.current_pos[0])/2 + self.current_pos[0], self.accel[0] ] , [ (target_pos[1]-self.current_pos[1])/2 + self.current_pos[1], self.accel[1] ], (target_pos[2]-self.current_pos[2])/2 ]    # format is : [position, acceleration]
+        s2 = [ [ target_pos[0], -self.accel[0] ], [ target_pos[1], -self.accel[1] ], target_pos[2] ]
         out.append(s1)
         out.append(s2)
-        return out  # should return 3d array of acceleration values with corresponding positions and accelerations we should be hitting
+        return out  # should return 3d array of path steps with corresponding positions and accelerations we should be hitting
     
-    def update(self):   # TODO: need to add code that goes to next set point if we are within tolerable range of setpoint (3cm ish), can ignore acceleration if we already reached the setpoint
+    def update(self):
         self.prev_pos = self.current_pos
         self.current_pos = get_pos()
         dt = get_dt()
@@ -72,8 +80,8 @@ class dronePID:
         out = [0, 0, 0, 0]
         for i in range(len(2)): # x and y pid control
             pos_error = self.target_pos[i] - self.current_pos[i]
-            if abs(pos_error) <= 30 and state == "follow":
-                next_setpoint()
+            if abs(pos_error) <= 30 and self.state[i] == "follow":
+                next_setpoint(i)
             self.error[i] =  self.target_acc[i] - self.current_acc[i]
             self.p[i] = self.Kp[i] * self.error[i]
             self.i[i] += self.Ki[i] * self.error[i]
@@ -84,7 +92,7 @@ class dronePID:
             self.d[i] = self.Kd[i] * (self.error[i] - self.prev_error[i])/dt
             self.restoring = self.Kr * pos_error
             self.prev_error = self.error
-            out[i] = (state == "follow" ? self.p[i] + self.i[i] + self.d[i] : 0) + (abs(restoring_error) < 30 ? self.restoring : 0)
+            out[i] = (self.state[i] == "follow" ? self.p[i] + self.i[i] + self.d[i] : 0) + (abs(restoring_error) < 30 ? self.restoring : 0)
             if out[i] > 150:
                 out[i] = 150
             elif out[i] < -150:
@@ -94,8 +102,11 @@ class dronePID:
             else:
                 out[i] = out[i]*-64/-150
             out[i] = round(out[i] + 64)
+
         #TODO: special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
-        self.error[2] = self.target_pos[2] - self.current_pos[2]
+        self.error[2] = self.imm_target[2] - self.current_pos[2]
+        if abs(self.error[2]) < 30 and self.state[i] == "follow":
+            next_setpoint(i)
         self.p[2] = self.Kp[2] * self.error[2]
         self.i[2] += self.Ki[2] * self.error[2]
         if self.i[2] > self.max_i:
@@ -110,8 +121,9 @@ class dronePID:
         elif out[i] < -64:
             out[i] = -64
         out[i] = round(out[i] + 64)
+
         #TODO: special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
-        if state == "hover":
+        if not ("follow" in state):
             self.error[3] = self.target_pos[3] - self.current_pos[3]
             self.p[i] = self.Kp[3] * self.error[3]
             self.i[i] += self.Ki[3] * self.error[3]
@@ -135,7 +147,7 @@ class dronePID:
         # exception is the drone's rotation which must be collected and expressed in relation to the absolute coordinates (calibration coordinates)
         global mode
         if mode=="sim":
-            continue #get feedback from lstm model
+            continue #get feedback from lstm model, i.e. ask lstm model to predict next position
         elif mode=="vicon":
             continue #get position from vicon cameras
         else:

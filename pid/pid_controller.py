@@ -1,10 +1,9 @@
 from time import time
 import math
-
-mode = "sim"
+import sys
 
 class dronePID:
-    def __init__(self, Kp=1.2, Ki=0.1, Kd=0.5, max_a = 150):
+    def __init__(self, Kp=1.2, Ki=0.1, Kd=0.5, max_a = 150, mode = "sim"):
         self.last_five_vel = []
         self.current_pos = [0, 0, 0, 0]
         self.prev_pos = [0, 0, 0, 0]
@@ -32,6 +31,7 @@ class dronePID:
         self.last_time = 0
         self.state = ["hover", "hover", "hover"] # or "follow" or "wait"
         self.imm_target = [0,0]
+        self.mode = mode # sim or vicon
     
     def setpoint(self, x_pos, y_pos, z_pos, rot):
         self.target_pos = [x_pos, y_pos, z_pos, rot]
@@ -73,10 +73,33 @@ class dronePID:
         return out  # should return 3d array of path steps with corresponding positions and accelerations we should be hitting
     
     def update(self):
-        self.prev_pos = self.current_pos
-        self.current_pos = get_pos()
         dt = get_dt()
-        last_five_vel.append([(self.current_pos[0]-self.prev_pos[0])/dt, (self.current_pos[1]-self.prev_pos[1])/dt, (self.current_pos[2]-self.prev_pos[2])/dt])     # don't need to track rot velocity
+
+        for i in range(4):
+            last_five_vel[i] = last_five_vel[i+1]
+        abs_x_vel = (self.current_pos[0]-self.prev_pos[0])/dt
+        abs_y_vel = (self.current_pos[1]-self.prev_pos[1])/dt
+        super_vel_vec = math.sqrt( abs_x_vel**2 + abs_y_vel**2 )
+        vel_angle = math.atan(abs_y_vel, abs_x_vel)
+        relative_angle = self.current_pos[3] - vel_angle
+
+        last_five_vel[4] = [ super_vel_vec * cos(relative_angle) , super_vel_vec * sin(relative_angle) , (self.current_pos[2]-self.prev_pos[2])/dt ]    # don't need to track rot velocity
+        
+        mean_v = [0]*3
+        for i in len(range(3)):
+            mean_v[i] = sum(last_five_vel[j for j in len(range(5))][i])/5
+        
+        accel = [0]*3
+        
+        for i in len(last_five_vel):
+            accel[0] += ( ( i-2 ) * dt ) * ( last_five_vel[i] - mean_v[0] ) / (10 * dt**2)
+            accel[1] += ( ( i-2 ) * dt ) * ( last_five_vel[i] - mean_v[1] ) / (10 * dt**2)
+            accel[2] += ( ( i-2 ) * dt ) * ( last_five_vel[i] - mean_v[2] ) / (10 * dt**2)
+
+        self.current_acc = accel
+
+        #TODO: add step that does least squares estimate of acceleration based on last 5 velocities
+
         out = [0, 0, 0, 0]
         for i in range(len(2)): # x and y pid control
             pos_error = self.target_pos[i] - self.current_pos[i]
@@ -103,7 +126,7 @@ class dronePID:
                 out[i] = out[i]*-64/-150
             out[i] = round(out[i] + 64)
 
-        #TODO: special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
+        # special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
         self.error[2] = self.imm_target[2] - self.current_pos[2]
         if abs(self.error[2]) < 30 and self.state[i] == "follow":
             next_setpoint(i)
@@ -122,7 +145,7 @@ class dronePID:
             out[i] = -64
         out[i] = round(out[i] + 64)
 
-        #TODO: special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
+        # special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
         if not ("follow" in state):
             self.error[3] = self.target_pos[3] - self.current_pos[3]
             self.p[i] = self.Kp[3] * self.error[3]
@@ -141,22 +164,29 @@ class dronePID:
             out[i] = round(out[i] + 64)
         else:
             out[i] = 64
+        
+        self.prev_pos = self.current_pos
+        
         return out  # output format: [ x, y, z, rot ]
     
-    def get_pos(self):  # in this func we need to preprocess data with rot reported by model/vicon, this will let us calculate velocity and accel correctly according to the drone's orientation, converting from absolute coordinates to coordinates relative to drone's axis
+    def get_pos(self, new_pos):  # in this func we need to preprocess data with rot reported by model/vicon, this will let us calculate velocity and accel correctly according to the drone's orientation, converting from absolute coordinates to coordinates relative to drone's axis
         # exception is the drone's rotation which must be collected and expressed in relation to the absolute coordinates (calibration coordinates)
-        global mode
-        if mode=="sim":
-            continue #get feedback from lstm model, i.e. ask lstm model to predict next position
-        elif mode=="vicon":
+        if self.mode=="sim":
+            self.current_pos = [new_pos[3], new_pos[4], new_pos[5], new_pos[2]]
+        elif self.mode=="vicon":
             continue #get position from vicon cameras
         else:
             print("invalid mode")
-            exit()
-        return
+            sys.exit(1)
     
     def get_dt(self):
-        self.current_time = time.now()
-        dt = self.current_time - self.last_time
-        self.last_time = self.current_time
+        if self.mode=="sim":
+            dt = 1/30
+        elif self.mode=="vicon":
+            self.current_time = time.time()
+            dt = self.current_time - self.last_time
+            self.last_time = self.current_time
+        else:
+            print("invalid mode")
+            sys.exit(1)
         return dt

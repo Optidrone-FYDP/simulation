@@ -49,28 +49,31 @@ class Predictor:
 
 # sys.argv[2:8] for start_pos_arr
     def start_predictor(self, start_pos_arr):
+        print(f"starting pos: {start_pos_arr}")
         self.start_RX, self.start_RY, self.start_RZ, self.start_TX, self.start_TY, self.start_TZ = map(float, start_pos_arr)
         self.model.load_state_dict(torch.load(self.path, map_location = self.device, weights_only=True))
         self.model.eval()
         self.current_position = np.array(
-            [start_RX, start_RY, start_RZ, start_TX, start_TY, start_TZ], dtype=np.float32
+            [self.start_RX, self.start_RY, self.start_RZ, self.start_TX, self.start_TY, self.start_TZ], dtype=np.float32
         )
-        self.positions = [current_position.copy()]
-        self.last_pots = [64] * SEQ_LENGTH
+        print(f"current_position according to predictor: {self.current_position}")
+        self.positions = [self.current_position.copy()]
+        self.last_pots = [[64, 64, 64] for _ in range(self.seq_length)]
 
-    def predict_next(next_pot_in):
-        for i in len(last_pots-1):
-            last_pots[i] = last_pots[i+1]
-        last_pots[len(last_pots-1)] = next_pot_in
+    def predict_next(self, next_pot_in):
+        print(self.last_pots)
+        for i in range(len(self.last_pots)-1):
+            self.last_pots[i] = self.last_pots[i+1]
+        self.last_pots[len(self.last_pots)-1] = next_pot_in[0:3]
         input_seq = (
-            torch.tensor(last_pots, dtype=torch.float32)
+            torch.tensor(np.array(self.last_pots, dtype=np.float32), dtype=torch.float32)
             .unsqueeze(0)
             .to(DEVICE)
         )
         with torch.no_grad():
-            pred = model(input_seq).cpu().numpy().flatten()
+            pred = self.model(input_seq).cpu().numpy().flatten()
         current_position = pred
-        positions.append(current_position.copy())
+        self.positions.append(current_position.copy())
         return current_position
 
     def output_flight(self):

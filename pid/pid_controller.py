@@ -29,9 +29,11 @@ class dronePID:
         self.setpoint_step = 0
         self.current_time = 0
         self.last_time = 0
-        self.state = ["hover", "hover", "hover"] # or "follow" or "wait"
+        self.state = ["hover", "hover", "hover", "hover"] # or "follow" or "wait" or "start"
         self.imm_target = [0,0,0]
         self.mode = mode # sim or vicon
+        self.reached_target = False
+        self.do_rotation = False
     
     def setpoint(self, x_pos, y_pos, z_pos, rot):
         self.target_pos = [x_pos, y_pos, z_pos, rot]
@@ -40,25 +42,41 @@ class dronePID:
         #print(self.profiled_path)
         for i in range(len(self.state)):
             self.state[i] = "start"
-            self.next_setpoint(i)
+        self.next_setpoint()
 
-    def next_setpoint(self, axis):
-        if self.state[axis] == "start":
+    def next_setpoint(self):
+        if "start" in self.state:
+            self.reached_target = False
+            self.do_rotation = False
             self.setpoint_step = 0
             self.imm_target[0] = self.profiled_path[self.setpoint_step][0][0]
             self.target_acc[0] = self.profiled_path[self.setpoint_step][0][1]
             self.imm_target[1] = self.profiled_path[self.setpoint_step][1][0]
             self.target_acc[1] = self.profiled_path[self.setpoint_step][1][1]
             self.imm_target[2] = self.profiled_path[self.setpoint_step][2]
-            self.state[axis] = "follow"
-        elif self.state[axis] == "follow":
-            self.state[axis] = "wait"
-            if "follow" in self.state:
-                return
+            for i in range(len(self.state)):
+                self.state[i] = "follow"
+        elif "follow" in self.state:
+            for i in range(len(self.state)):
+                if self.state[i] == "follow":
+                    if i == 3:
+                        if math.abs(self.target_pos[3] - self.current_pos[3]) < 0.01:
+                            self.do_rotation = False
+                            self.state[i] = "wait"
+                        else:
+                            for i in range(len(self.state)-1):
+                                if self.state[i] == "follow":
+                                    return
+                            self.do_rotation = True
+                    else:
+                        if math.abs(self.imm_target[i]-self.current_pos[i]) < 30:
+                            self.state[i] = "wait"
+        else:
             self.setpoint_step += 1
             if self.setpoint_step >= len(self.profiled_path):
                 for i in range(len(self.state)):
                     self.state[i] = "hover"
+                    self.reached_target = True
             else:
                 for i in range(len(self.state)):
                     self.state[i] = "follow"
@@ -90,7 +108,8 @@ class dronePID:
         abs_x_vel = (self.current_pos[0]-self.prev_pos[0])/dt
         abs_y_vel = (self.current_pos[1]-self.prev_pos[1])/dt
 
-        # need to refine math that converts absolute vectors into the reference (drone) frame
+        # TODO: need to refine math that converts absolute vectors into the reference (drone) frame
+
         #super_vel_vec = math.sqrt( abs_x_vel**2 + abs_y_vel**2 )
         #if abs_y_vel == 0:
         #    if abs_x_vel > 0:
@@ -126,18 +145,14 @@ class dronePID:
 
         self.current_acc = accel
 
-        #TODO: add step that does least squares estimate of acceleration based on last 5 velocities
-
         out = [0, 0, 0, 0]
         for i in range(2): # x and y pid control
-            pos_error = self.target_pos[i] - self.current_pos[i]
+            pos_error = self.imm_target[i] - self.current_pos[i]
             #print("x-y pid")
             #print(pos_error)
             #print(self.target_pos[i])
             #print(self.current_pos[i])
             #print(self.state[i])
-            if abs(pos_error) <= 30 and self.state[i] == "follow":
-                self.next_setpoint(i)
             self.error[i] =  self.target_acc[i] - self.current_acc[i]
             self.p[i] = self.Kp[i] * self.error[i]
             self.i[i] += self.Ki[i] * self.error[i]
@@ -161,8 +176,6 @@ class dronePID:
 
         # special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
         self.error[2] = self.imm_target[2] - self.current_pos[2]
-        if abs(self.error[2]) < 30 and self.state[i] == "follow":
-            next_setpoint(i)
         self.p[2] = self.Kp[2] * self.error[2]
         self.i[2] += self.Ki[2] * self.error[2]
         if self.i[2] > self.max_i:
@@ -179,7 +192,7 @@ class dronePID:
         out[2] = round(out[2] + 64)
 
         # special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
-        if not ("follow" in self.state):
+        if self.do_rotation:
             self.error[3] = self.target_pos[3] - self.current_pos[3]
             self.p[3] = self.Kp[3] * self.error[3]
             self.i[3] += self.Ki[3] * self.error[3]
@@ -197,6 +210,8 @@ class dronePID:
             out[3] = round(out[3] + 64)
         else:
             out[3] = 64
+
+        self.next_setpoint()
         
         self.prev_pos = self.current_pos
         

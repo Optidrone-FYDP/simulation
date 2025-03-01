@@ -3,7 +3,7 @@ import math
 import sys
 
 class dronePID:
-    def __init__(self, Kp=1.2, Ki=0.1, Kd=0.5, max_a = 150, mode = "sim"):
+    def __init__(self, Kp=0.5, Ki=0.01, Kd=0.1, max_a = 150, mode = "sim"):
         self.last_five_vel = [[0]*3,[0]*3,[0]*3,[0]*3,[0]*3]
         self.current_pos = [0, 0, 0, 0]
         self.prev_pos = [0, 0, 0, 0]
@@ -36,8 +36,8 @@ class dronePID:
     def setpoint(self, x_pos, y_pos, z_pos, rot):
         self.target_pos = [x_pos, y_pos, z_pos, rot]
         self.profiled_path = self.profile(self.target_pos)
-        print("profiled path:")
-        print(self.profiled_path)
+        #print("profiled path:")
+        #print(self.profiled_path)
         for i in range(len(self.state)):
             self.state[i] = "start"
             self.next_setpoint(i)
@@ -89,26 +89,28 @@ class dronePID:
 
         abs_x_vel = (self.current_pos[0]-self.prev_pos[0])/dt
         abs_y_vel = (self.current_pos[1]-self.prev_pos[1])/dt
-        super_vel_vec = math.sqrt( abs_x_vel**2 + abs_y_vel**2 )
-        if abs_y_vel == 0:
-            if abs_x_vel > 0:
-                vel_angle = math.pi/2
-            elif abs_x_vel < 0:
-                vel_angle = -math.pi/2
-            else:
-                vel_angle = 0
-        else:
-            vel_angle = math.atan(abs_x_vel/abs_y_vel)
-        relative_angle = self.current_pos[3] - vel_angle
-        print(f"current pos: {self.current_pos}")
-        print(f"target pos: {self.target_pos}")
-        print(f"abs_x_vel: {abs_x_vel}")
-        print(f"abs_y_vel: {abs_y_vel}")
-        print(f"super_vel_vec: {super_vel_vec}")
-        print(f"vel_angle: {vel_angle}")
-        print(f"relative_angle: {relative_angle}")
 
-        self.last_five_vel[4] = [ super_vel_vec * math.cos(relative_angle) , super_vel_vec * math.sin(relative_angle) , (self.current_pos[2]-self.prev_pos[2])/dt ]    # don't need to track rot velocity
+        # need to refine math that converts absolute vectors into the reference (drone) frame
+        #super_vel_vec = math.sqrt( abs_x_vel**2 + abs_y_vel**2 )
+        #if abs_y_vel == 0:
+        #    if abs_x_vel > 0:
+        #        vel_angle = math.pi/2
+        #    elif abs_x_vel < 0:
+        #        vel_angle = -math.pi/2
+        #    else:
+        #        vel_angle = 0
+        #else:
+        #    vel_angle = math.atan(abs_x_vel/abs_y_vel)
+        #relative_angle = self.current_pos[3] - vel_angle
+        #print(f"current pos: {self.current_pos}")
+        #print(f"target pos: {self.target_pos}")
+        #print(f"abs_x_vel: {abs_x_vel}")
+        #print(f"abs_y_vel: {abs_y_vel}")
+        #print(f"super_vel_vec: {super_vel_vec}")
+        #print(f"vel_angle: {vel_angle}")
+        #print(f"relative_angle: {relative_angle}")
+
+        self.last_five_vel[4] = [ abs_x_vel , abs_y_vel , (self.current_pos[2]-self.prev_pos[2])/dt ]    # don't need to track rot velocity
         
         mean_v = [0]*3
         for i in range(3):
@@ -129,11 +131,11 @@ class dronePID:
         out = [0, 0, 0, 0]
         for i in range(2): # x and y pid control
             pos_error = self.target_pos[i] - self.current_pos[i]
-            print("x-y pid")
-            print(pos_error)
-            print(self.target_pos[i])
-            print(self.current_pos[i])
-            print(self.state[i])
+            #print("x-y pid")
+            #print(pos_error)
+            #print(self.target_pos[i])
+            #print(self.current_pos[i])
+            #print(self.state[i])
             if abs(pos_error) <= 30 and self.state[i] == "follow":
                 self.next_setpoint(i)
             self.error[i] =  self.target_acc[i] - self.current_acc[i]
@@ -146,15 +148,15 @@ class dronePID:
             self.d[i] = self.Kd[i] * (self.error[i] - self.prev_error[i])/dt
             self.restoring[i] = self.Kr * pos_error
             self.prev_error = self.error
-            out[i] = (self.p[i] + self.i[i] + self.d[i] if self.state[i] == "follow" else 0) + (self.restoring[i] if abs(pos_error) < 30 else 0)
+            out[i] = (self.p[i] + self.i[i] + self.d[i] if self.state[i]=="follow" else 0) + (self.restoring[i] if abs(pos_error) < 100 else 0)
             if out[i] > 150:
                 out[i] = 150
             elif out[i] < -150:
                 out[i] = -150
             if out[i] > 0:
-                out[i] = out[i]*63/150
+                out[i] = -out[i]*63/150
             else:
-                out[i] = out[i]*-64/-150
+                out[i] = -out[i]*-64/-150
             out[i] = round(out[i] + 64)
 
         # special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
@@ -202,10 +204,10 @@ class dronePID:
     
     def get_pos(self, new_pos):  # in this func we need to preprocess data with rot reported by model/vicon, this will let us calculate velocity and accel correctly according to the drone's orientation, converting from absolute coordinates to coordinates relative to drone's axis
         # exception is the drone's rotation which must be collected and expressed in relation to the absolute coordinates (calibration coordinates)
-        print(f"current_position fed to drone: {new_pos}")
+        #print(f"current_position fed to drone: {new_pos}")
         if self.mode=="sim":
-            self.current_pos = [new_pos[3], new_pos[4], new_pos[5], new_pos[2]]
-            print(f"current_position taken by drone: {self.current_pos}")
+            self.current_pos = [new_pos[0], new_pos[1], new_pos[2]]
+            #print(f"current_position taken by drone: {self.current_pos}")
         elif self.mode=="vicon":
             return #get position from vicon cameras
         else:

@@ -45,7 +45,7 @@ if __name__ == "__main__":
             if mode == "sim":
                 pid.get_pos(pred.current_position)
             else:
-                pid.get_pos(vicon.ingest()) #TODO: write ingest function in vicon class that requests a position from vicon cameras
+                pid.get_pos(vicon.get_frame())
             next_pots = pid.update()
             if pred.reached_target == True or keyboard.is_pressed('k'):
                 break

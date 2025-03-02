@@ -220,11 +220,13 @@ class dronePID:
     def get_pos(self, new_pos):  # in this func we need to preprocess data with rot reported by model/vicon, this will let us calculate velocity and accel correctly according to the drone's orientation, converting from absolute coordinates to coordinates relative to drone's axis
         # exception is the drone's rotation which must be collected and expressed in relation to the absolute coordinates (calibration coordinates)
         #print(f"current_position fed to drone: {new_pos}")
+
         if self.mode=="sim":
             self.current_pos = [new_pos[0], new_pos[1], new_pos[2]]
-            #print(f"current_position taken by drone: {self.current_pos}")
+
         elif self.mode=="vicon":
-            return #get position from vicon cameras
+            self.current_pos = [new_pos[0], new_pos[1], new_pos[2], new_pos[5]]
+
         else:
             print("invalid mode")
             sys.exit(1)

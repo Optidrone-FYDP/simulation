@@ -60,6 +60,7 @@ def compare_csvs(narx_file, lstm_file, actual_file, plot_type):
     plt.ylabel("Values")
     plt.grid()
     plt.show()
+    plt.savefig("temppp.png")
 
 
 if __name__ == "__main__":

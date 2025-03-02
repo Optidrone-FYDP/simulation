@@ -13,17 +13,20 @@ torch.manual_seed(seed_value)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(seed_value)
 
-DATA_PATH = "processed_data"
-MODEL_SAVE_PATH = "drone_movement_model_lstm_0.4.pt"
+DATA_PATH = "processed_data_v2"
+MODEL_SAVE_PATH = "drone_movement_model_lstm_0.2.pt"
 EPOCHS, BATCH_SIZE, LR = 1000, 32, 1e-3
-SEQ_LENGTH, HIDDEN_SIZE, NUM_LAYERS = 20, 64, 2
+SEQ_LENGTH, HIDDEN_SIZE, NUM_LAYERS = 10, 64, 2
 TRAIN_SPLIT = 0.8
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 ROT_NORM_FACTOR = 2 * np.pi
 
+
 def normalize_pot(x):
-    """Normalize potentiometer value: from [0, 128] to [-1, 1]."""
+    """Normalize potentiometer value: range [0, 128] with 64 as neutral becomes [-1, 1]."""
     return (x - 64.0) / 64.0
+
 
 class DroneDataset(Dataset):
     def __init__(self, folder):
@@ -32,30 +35,34 @@ class DroneDataset(Dataset):
             pd.read_csv(f, encoding="utf-8-sig").values.astype(np.float32)
             for f in files
         ]
+
         self.data = np.concatenate(dfs, axis=0) if dfs else np.empty((0, 11))
         if self.data.size:
-            self.data[:, 10] = normalize_pot(self.data[:, 10])
-            self.data[:, 9] = normalize_pot(self.data[:, 9])
-            self.data[:, 7] = normalize_pot(self.data[:, 7])
-            self.data[:, 8] = normalize_pot(self.data[:, 8])
-        print("Dataset shape:", self.data.shape)
+            self.data[:, 10] = normalize_pot(self.data[:, 10])  # potX
+            self.data[:, 9] = normalize_pot(self.data[:, 9])  # potY
+            self.data[:, 7] = normalize_pot(self.data[:, 7])  # potZ
+            self.data[:, 8] = normalize_pot(self.data[:, 8])  # potRot
+        print(self.data)
 
     def __len__(self):
-        return len(self.data) - SEQ_LENGTH if len(self.data) >= SEQ_LENGTH else 0
+        return (
+            len(self.data) - SEQ_LENGTH if len(self.data) >= SEQ_LENGTH else 0
+        )  # non-negative
 
     def __getitem__(self, idx):
         sequence = self.data[idx : idx + SEQ_LENGTH]
-        # [potX, potY, potZ, potRot]
         inputs = sequence[:, [10, 9, 7, 8]]
-        # translation delta (TX, TY, TZ) between the last two frames in the window
+        # Use only translation values: TX, TY, TZ (columns 4,5,6) to compute delta targets.
         target = (
             self.data[idx + SEQ_LENGTH, [4, 5, 6]]
             - self.data[idx + SEQ_LENGTH - 1, [4, 5, 6]]
         )
+        target[3:] = target[3:] / ROT_NORM_FACTOR
         return torch.tensor(inputs), torch.tensor(target)
 
+
 class DroneMovementModel(nn.Module):
-    def __init__(self, input_dim=4, hidden_dim=64, output_dim=3, num_layers=2):
+    def __init__(self, input_dim=4, hidden_dim=64, output_dim=3, num_layers=1):
         super(DroneMovementModel, self).__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
@@ -64,9 +71,11 @@ class DroneMovementModel(nn.Module):
         out, _ = self.lstm(x)
         return self.fc(out[:, -1, :])
 
+
+# training
 dataset = DroneDataset(DATA_PATH)
 if len(dataset) == 0:
-    raise ValueError("dataset empty, check data path")
+    raise ValueError("Dataset is empty. check csvs.")
 
 train_size = int(TRAIN_SPLIT * len(dataset))
 test_size = len(dataset) - train_size
@@ -94,6 +103,7 @@ train_losses = []
 test_losses = []
 epochs_record = []
 
+# training loop
 for epoch in range(1, EPOCHS + 1):
     model.train()
     train_loss = 0
@@ -122,6 +132,7 @@ for epoch in range(1, EPOCHS + 1):
     test_losses.append(avg_test_loss)
     epochs_record.append(epoch)
 
+    # halting criteria
     if avg_test_loss < best_test_loss:
         best_test_loss = avg_test_loss
         epochs_without_improvement = 0
@@ -155,7 +166,8 @@ for epoch in range(1, EPOCHS + 1):
         print(f"Early stopping at epoch {epoch}. Best Test Loss: {best_test_loss:.4f}")
         break
 
-print(f"Best model saved to {MODEL_SAVE_PATH}")
+torch.save(model.state_dict(), MODEL_SAVE_PATH)
+print(f"Model saved to {MODEL_SAVE_PATH}")
 
 plt.figure(figsize=(10, 5))
 plt.plot(epochs_record, train_losses, label="Train Loss")

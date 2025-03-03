@@ -2,6 +2,9 @@ from time import time
 import math
 import sys
 
+# x is left/right
+# y is forward/backward
+
 class dronePID:
     def __init__(self, Kp=0.5, Ki=0.01, Kd=0.1, max_a = 150, mode = "sim"):
         self.last_five_vel = [[0]*3,[0]*3,[0]*3,[0]*3,[0]*3]
@@ -147,13 +150,13 @@ class dronePID:
 
         out = [0, 0, 0, 0]
         for i in range(2): # x and y pid control
-            pos_error = self.imm_target[i] - self.current_pos[i]
+            pos_error = self.target_pos[i] - self.current_pos[i] #self.imm_target[i] - self.current_pos[i]
             #print("x-y pid")
             #print(pos_error)
             #print(self.target_pos[i])
             #print(self.current_pos[i])
             #print(self.state[i])
-            self.error[i] =  self.target_acc[i] - self.current_acc[i]
+            self.error[i] =  self.imm_target[i] - self.current_pos[i] #self.target_acc[i] - self.current_acc[i]
             self.p[i] = self.Kp[i] * self.error[i]
             self.i[i] += self.Ki[i] * self.error[i]
             if self.i[i] > self.max_i:
@@ -163,7 +166,7 @@ class dronePID:
             self.d[i] = self.Kd[i] * (self.error[i] - self.prev_error[i])/dt
             self.restoring[i] = self.Kr * pos_error
             self.prev_error = self.error
-            out[i] = (self.p[i] + self.i[i] + self.d[i] if self.state[i]=="follow" else 0) + (self.restoring[i] if abs(pos_error) < 100 else 0)
+            out[i] = self.p[i] + self.i[i] + self.d[i] # + (self.restoring[i] if abs(pos_error) < 100 else 0)
             if out[i] > 150:
                 out[i] = 150
             elif out[i] < -150:
@@ -192,7 +195,7 @@ class dronePID:
         out[2] = round(out[2] + 64)
 
         # special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
-        if self.do_rotation:
+        if self.do_rotation and mode == "vicon":
             self.error[3] = self.target_pos[3] - self.current_pos[3]
             self.p[3] = self.Kp[3] * self.error[3]
             self.i[3] += self.Ki[3] * self.error[3]

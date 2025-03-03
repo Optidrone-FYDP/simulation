@@ -4,7 +4,7 @@ import time
 import json
 import pandas as pd
 
-uart_port = serial.Serial("COM3", 9600, timeout=5)
+uart_port = None #uart_port = serial.Serial("COM5", 9600, timeout=5)
 fps = 30
 
 def hex_helper(int_in):
@@ -13,7 +13,11 @@ def hex_helper(int_in):
         hex_str = "0"+hex_str
     return bytes.fromhex(hex_str)
 
-on = False    
+on = False
+
+def open_serial():
+    global uart_port
+    uart_port = serial.Serial("COM5", 9600, timeout=5)
 
 # FUNCTIONS
 def controller_on():
@@ -69,9 +73,9 @@ def start_routine():
     df.to_csv(plan_name + "_out.csv")
 
 def send_to_controller(next_inputs):
-    uart_port.write(bytes.fromhex("03"))    #front/back
-    uart_port.write(hex_helper(next_inputs[0]))
     uart_port.write(bytes.fromhex("04"))    #left/right
+    uart_port.write(hex_helper(next_inputs[0]))
+    uart_port.write(bytes.fromhex("03"))    #front/back
     uart_port.write(hex_helper(next_inputs[1]))
     uart_port.write(bytes.fromhex("01"))    #up/down
     uart_port.write(hex_helper(next_inputs[2]))
@@ -115,58 +119,58 @@ def clear_entries():
 # GUI
 
 # Create root window and main title
-root = tk.Tk()
-root.title("OptiDrone Test Flight Controls")
-title_lbl = tk.Label(root, text="OptiDrone Test Flight Controls")
+# root = tk.Tk()
+# root.title("OptiDrone Test Flight Controls")
+# title_lbl = tk.Label(root, text="OptiDrone Test Flight Controls")
 
-# Create labels
-up_down_lbl = tk.Label(root, text="UP/DOWN (joystick n)")
-left_right_lbl = tk.Label(root, text="LEFT/RIGHT (joystick n)")
-forward_backward_lbl = tk.Label(root, text="FORWARD/BACKWARD (joystick n)")
-plan_name_lbl = tk.Label(root, text="Flight Plan Name:")
+# # Create labels
+# up_down_lbl = tk.Label(root, text="UP/DOWN (joystick n)")
+# left_right_lbl = tk.Label(root, text="LEFT/RIGHT (joystick n)")
+# forward_backward_lbl = tk.Label(root, text="FORWARD/BACKWARD (joystick n)")
+# plan_name_lbl = tk.Label(root, text="Flight Plan Name:")
 
-# Create intvariables
-up_down_intvar = tk.IntVar(root, value=0)
-left_right_intvar = tk.IntVar(root, value=0)
-forward_backward_intvar = tk.IntVar(root, value=0)
-plan_name_strvar = tk.StringVar(root, value="test_plan_1")
+# # Create intvariables
+# up_down_intvar = tk.IntVar(root, value=0)
+# left_right_intvar = tk.IntVar(root, value=0)
+# forward_backward_intvar = tk.IntVar(root, value=0)
+# plan_name_strvar = tk.StringVar(root, value="test_plan_1")
 
-# Create entry boxes for user input
-up_down_ent = tk.Entry(root, textvariable=up_down_intvar)
-left_right_ent = tk.Entry(root, textvariable=left_right_intvar)
-forward_backward_ent = tk.Entry(root, textvariable=forward_backward_intvar)
-plan_name_ent = tk.Entry(root, textvariable=plan_name_strvar)
+# # Create entry boxes for user input
+# up_down_ent = tk.Entry(root, textvariable=up_down_intvar)
+# left_right_ent = tk.Entry(root, textvariable=left_right_intvar)
+# forward_backward_ent = tk.Entry(root, textvariable=forward_backward_intvar)
+# plan_name_ent = tk.Entry(root, textvariable=plan_name_strvar)
 
-# Create start flight button
-controller_on_btn = tk.Button(root, text="Controller On/Off", command=controller_on)
-start_flight_btn = tk.Button(root, text="Takeoff", command=start_flight)
-update_flight_btn = tk.Button(root, text="Update Flight", command=update_flight)
-land_btn = tk.Button(root, text="Land", command=land)
-get_state_btn = tk.Button(root, text="Get Joystick States", command=joy_status)
-fly_routine_btn = tk.Button(root, text="Fly Routine", command=start_routine)
+# # Create start flight button
+# controller_on_btn = tk.Button(root, text="Controller On/Off", command=controller_on)
+# start_flight_btn = tk.Button(root, text="Takeoff", command=start_flight)
+# update_flight_btn = tk.Button(root, text="Update Flight", command=update_flight)
+# land_btn = tk.Button(root, text="Land", command=land)
+# get_state_btn = tk.Button(root, text="Get Joystick States", command=joy_status)
+# fly_routine_btn = tk.Button(root, text="Fly Routine", command=start_routine)
 
-# Create clear button
-clear_btn = tk.Button(root, text="Clear Entries", command=clear_entries)
+# # Create clear button
+# clear_btn = tk.Button(root, text="Clear Entries", command=clear_entries)
 
-# Grid widgets onto root window
-title_lbl.grid(column=0, row=0)
-up_down_lbl.grid(column=0, row=1)
-left_right_lbl.grid(column=0, row=2)
-forward_backward_lbl.grid(column=0, row=3)
-plan_name_lbl.grid(column=0, row=4)
+# # Grid widgets onto root window
+# title_lbl.grid(column=0, row=0)
+# up_down_lbl.grid(column=0, row=1)
+# left_right_lbl.grid(column=0, row=2)
+# forward_backward_lbl.grid(column=0, row=3)
+# plan_name_lbl.grid(column=0, row=4)
 
-up_down_ent.grid(column=1, row=1)
-left_right_ent.grid(column=1, row=2)
-forward_backward_ent.grid(column=1, row=3)
-plan_name_ent.grid(column=1, row=4)
+# up_down_ent.grid(column=1, row=1)
+# left_right_ent.grid(column=1, row=2)
+# forward_backward_ent.grid(column=1, row=3)
+# plan_name_ent.grid(column=1, row=4)
 
-controller_on_btn.grid(column=0, row=5, columnspan=2)
-start_flight_btn.grid(column=0, row=6, columnspan=2)
-update_flight_btn.grid(column=0, row=7, columnspan=2)
-fly_routine_btn.grid(column=0, row=8, columnspan=2)
-land_btn.grid(column=0, row=9, columnspan=2)
-clear_btn.grid(column=0, row=10, columnspan=2)
-get_state_btn.grid(column=0, row=11, columnspan=2)
+# controller_on_btn.grid(column=0, row=5, columnspan=2)
+# start_flight_btn.grid(column=0, row=6, columnspan=2)
+# update_flight_btn.grid(column=0, row=7, columnspan=2)
+# fly_routine_btn.grid(column=0, row=8, columnspan=2)
+# land_btn.grid(column=0, row=9, columnspan=2)
+# clear_btn.grid(column=0, row=10, columnspan=2)
+# get_state_btn.grid(column=0, row=11, columnspan=2)
 
-# Run the GUI
-root.mainloop()
+# # Run the GUI
+# root.mainloop()

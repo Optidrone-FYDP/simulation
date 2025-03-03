@@ -22,7 +22,7 @@ class Vicon:
     def get_frame(self):
         ret = self.client.GetFrame()
         if ret:
-            print("Fram received")
+            print("Frame received")
         else:
             print(f"Frame not received. Error code: {ret}")
         print(f"Frame {self.client.GetFrameNumber()} received.")

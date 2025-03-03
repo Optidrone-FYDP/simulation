@@ -92,6 +92,7 @@ if __name__ == "__main__":
                 pid.get_pos(vicon.get_frame())
             next_pots = pid.update()
             if pid.reached_target == True or keyboard.is_pressed('k'):
+                print("k is pressed, aborting")
                 break
             if mode == "sim":
                 print(pred.current_position)

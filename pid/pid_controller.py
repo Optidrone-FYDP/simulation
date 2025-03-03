@@ -11,9 +11,9 @@ class dronePID:
         self.prev_pos = [0, 0, 0, 0]
         self.target_pos = [0, 0, 0, 0]
         self.starting_pos = [0, 0, 0, 0]
-        self.Kp = [Kp, Kp, Kp, 0.1]
-        self.Ki = [Ki, Ki, Ki, 0.001]
-        self.Kd = [Kd, Kd, Kd, 0.01]
+        self.Kp = [Kp, Kp, 0.1, 6]
+        self.Ki = [Ki, Ki, 0.001, 0.001]
+        self.Kd = [Kd, Kd, 0.01, 1]
         self.error = [0, 0, 0, 0]
         self.max_i = 300
         self.prev_error = [0, 0, 0, 0]
@@ -35,23 +35,21 @@ class dronePID:
         self.state = "start"
         self.next_setpoint()
 
-    def find_travel_angle():
+    def find_travel_angle(self):
         o = (self.target_pos[1] - self.starting_pos[1])
         a = (self.target_pos[0] - self.starting_pos[0])
 
         rot_target = 0
-        if a = 0 and o > 0:
-            self.rot_target = 3*math.pi/2
-        elif a = 0 and o < 0:
-            self.rot_target = math.pi/2
-        elif a = 0 and o = 0:
+        if a == 0 and o > 0:
             self.rot_target = 0
-        elif o > 0 and a > 0 or o < 0 and a > 0:
-            self.rot_target = math.pi + math.atan(o/a)
-        elif o > 0 and a < 0:
-            self.rot_target = 2*math.pi + math.atan(o/a)
-        elif o < 0 and a < 0:
-            self.rot_target = math.atan(o/a)
+        elif a == 0 and o < 0:
+            self.rot_target = math.pi
+        elif a == 0 and o == 0:
+            self.rot_target = 0
+        elif a > 0:
+            self.rot_target = 3*math.pi/2 + math.atan(o/a)
+        elif a < 0:
+            self.rot_target = math.pi/2 + math.atan(o/a)
         else:
             self.rot_target = 0
 
@@ -63,33 +61,33 @@ class dronePID:
             ending_rotation -> rotation at end to match desired rotation
             hover -> all states done and holding position
         '''
-        if self.state is "start":
+        if self.state == "start":
             self.reached_target = False
             self.starting_pos = self.current_pos
-            find_travel_angle()
+            self.find_travel_angle()
             self.state = "starting_rotation"
-        elif self.state is "starting_rotation":
-            if math.fabs(self.current_pos[3] - self.rot_target) < 0.0087:
+        elif self.state == "starting_rotation":
+            if math.fabs(self.current_pos[3] - self.rot_target) < 0.0174:
                 self.state = "follow"
-        elif self.state is "follow":
-            if dist(self.target_pos[0], self.current_pos[0], self.target_pos[1], self.current_pos[1]) < 30:
+        elif self.state == "follow":
+            if self.dist(self.target_pos[0], self.current_pos[0], self.target_pos[1], self.current_pos[1]) < 30:
                 self.state = "ending_rotation"
-        elif self.state is "ending_rotation":
-            if math.fabs(self.current_pos[3] - self.target_pos[3]) < 0.0087:
+        elif self.state == "ending_rotation":
+            if math.fabs(self.current_pos[3] - self.target_pos[3]) < 0.0174:
                 self.state = "hover"
-            #if dist(self.target_pos[0], self.current_pos[0], self.target_pos[1], self.current_pos[1]) > 30:
+            #if self.dist(self.target_pos[0], self.current_pos[0], self.target_pos[1], self.current_pos[1]) > 30:
             #    self.state = "follow"
-        elif self.state is "hover":
+        elif self.state == "hover":
             self.reached_target = True
 
-    def find_nearest_point():
+    def find_nearest_point(self):
         t = ((self.current_pos[0] - self.starting_pos[0])*(self.target_pos[0] - self.starting_pos[0]) + (self.current_pos[1] - self.starting_pos[1])*(self.target_pos[1] - self.starting_pos[1]))/((self.target_pos[0]-self.starting_pos[0])**2+(self.target_pos[1]-self.starting_pos[1])**2)
         closest_x = self.starting_pos[0] + t*(self.target_pos[0] - self.starting_pos[0])
         closest_y = self.starting_pos[1] + t*(self.target_pos[1] - self.starting_pos[1])
         return [closest_x, closest_y]
 
-    def above_below():
-        sign = (self.target_pos[0] - self.starting_pos[0])(self.current_pos[1] - self.starting_pos[1]) - (self.target_pos[1] - self.starting_pos[1])(self.current_pos[0] - self.starting_pos[0])
+    def above_below(self):
+        sign = (self.target_pos[0] - self.starting_pos[0])*(self.current_pos[1] - self.starting_pos[1]) - (self.target_pos[1] - self.starting_pos[1])*(self.current_pos[0] - self.starting_pos[0])
         if sign < 0:
             return 1
         elif sign > 0:
@@ -97,7 +95,7 @@ class dronePID:
         else:
             return 0
 
-    def dist(x1, x2, y1, y2):
+    def dist(self, x1, x2, y1, y2):
         return math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
     def update(self):
@@ -106,10 +104,10 @@ class dronePID:
         nearest = self.find_nearest_point()
 
         out = [64, 64, 64, 64]
-        if not self.state is "starting_rotation" or not self.state is "ending_rotation":        # do not run xyz pids when adjusting rotation, could be bad bad bad
+        if not self.state == "starting_rotation" or not self.state == "ending_rotation" and False:        # do not run xyz pids when adjusting rotation, could be bad bad bad
 
             # x-axis
-            self.error[0] =  above_below()*dist(nearest[0], self.current_pos[0], nearest[1], self.current_pos[1])
+            self.error[0] =  self.above_below()*self.dist(nearest[0], self.current_pos[0], nearest[1], self.current_pos[1])
             
             self.p[0] = self.Kp[0] * self.error[0]
             
@@ -140,7 +138,7 @@ class dronePID:
             out[0] = round(out[0] + 64)
 
             # y-axis
-            self.error[1] = dist(self.target_pos[0], nearest[0], self.target_pos[1], nearest[1])
+            self.error[1] = self.dist(self.target_pos[0], nearest[0], self.target_pos[1], nearest[1])
             
             self.p[1] = self.Kp[1] * self.error[1]
             
@@ -176,10 +174,10 @@ class dronePID:
             self.p[2] = self.Kp[2] * self.error[2]
             
             self.i[2] += self.Ki[2] * self.error[2]
-            if self.i[2] > self.max_i:
-                self.i[2] = self.max_i
-            elif self.i[2] < -self.max_i:
-                self.i[2] = -self.max_i
+            if self.i[2] > 1:
+                self.i[2] = 1
+            elif self.i[2] < -1:
+                self.i[2] = -1
                 
             self.d[2] = self.Kd[2] * (self.error[2] - self.prev_error[2])/dt
             
@@ -194,11 +192,13 @@ class dronePID:
             out[2] = round(out[2] + 64)
 
         # special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path
-        if self.state is "ending_rotation":
+        if self.state == "ending_rotation":
             target = self.target_pos[3]
         else:
             target = self.rot_target
+
         self.error[3] = target - self.current_pos[3]
+        self.error[3] = (self.error[3] + math.pi) % (2 * math.pi) - math.pi
         
         self.p[3] = self.Kp[3] * self.error[3]
         
@@ -213,10 +213,10 @@ class dronePID:
         self.prev_error = self.error
         
         out[3] = self.p[3] + self.i[3] + self.d[3]
-        if out[3] > 63:
-            out[3] = 63
-        elif out[3] < -64:
-            out[3] = -64
+        if out[3] > 30:
+            out[3] = 30
+        elif out[3] < -30:
+            out[3] = -30
         out[3] = round(out[3] + 64)
 
         self.next_setpoint()

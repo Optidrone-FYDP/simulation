@@ -1,4 +1,4 @@
-from time import time
+import time
 import math
 import sys
 
@@ -6,16 +6,16 @@ import sys
 # y is forward/backward
 
 class dronePID:
-    def __init__(self, Kp=0.5, Ki=0.01, Kd=0.1, max_a = 150, mode = "sim"):
+    def __init__(self, Kp=0.1, Ki=0.001, Kd=0.05, max_a = 150, mode = "sim"):
         self.last_five_vel = [[0]*3,[0]*3,[0]*3,[0]*3,[0]*3]
         self.current_pos = [0, 0, 0, 0]
         self.prev_pos = [0, 0, 0, 0]
         self.current_acc = [0, 0, 0, 0]
         self.target_pos = [0, 0, 0, 0]
         self.target_acc = [0, 0, 0, 0]
-        self.Kp = [Kp, Kp, Kp, Kp]
-        self.Ki = [Ki, Ki, Ki, Ki]
-        self.Kd = [Kd, Kd, Kd, Kd]
+        self.Kp = [Kp, Kp, Kp, 0.1]
+        self.Ki = [Ki, Ki, Ki, 0.001]
+        self.Kd = [Kd, Kd, Kd, 0.01]
         self.error = [0, 0, 0, 0]
         self.max_i = 300
         self.prev_error = [0, 0, 0, 0]
@@ -63,7 +63,7 @@ class dronePID:
             for i in range(len(self.state)):
                 if self.state[i] == "follow":
                     if i == 3:
-                        if math.abs(self.target_pos[3] - self.current_pos[3]) < 0.01:
+                        if math.fabs(self.target_pos[3] - self.current_pos[3]) < 0.01:
                             self.do_rotation = False
                             self.state[i] = "wait"
                         else:
@@ -72,7 +72,7 @@ class dronePID:
                                     return
                             self.do_rotation = True
                     else:
-                        if math.abs(self.imm_target[i]-self.current_pos[i]) < 30:
+                        if math.fabs(self.imm_target[i]-self.current_pos[i]) < 30:
                             self.state[i] = "wait"
         else:
             self.setpoint_step += 1
@@ -172,9 +172,13 @@ class dronePID:
             elif out[i] < -150:
                 out[i] = -150
             if out[i] > 0:
-                out[i] = -out[i]*63/150
+                out[i] = out[i]*63/150
             else:
-                out[i] = -out[i]*-64/-150
+                out[i] = out[i]*-64/-150
+            if out[i] > 20:
+                out[i] = 20
+            elif out[i] < -20:
+                out[i] = -20
             out[i] = round(out[i] + 64)
 
         # special z-axis control (z-axis has higher accel and stopping input basically maintains position so we can do this one off position alone)
@@ -188,10 +192,10 @@ class dronePID:
         self.d[2] = self.Kd[2] * (self.error[2] - self.prev_error[2])/dt
         self.prev_error = self.error
         out[2] = self.p[2] + self.i[2] + self.d[2]
-        if out[2] > 63:
-            out[2] = 63
-        elif out[2] < -64:
-            out[2] = -64
+        if out[2] > 16:
+            out[2] = 16
+        elif out[2] < -16:
+            out[2] = -16
         out[2] = round(out[2] + 64)
 
         # special rot control (rot moves too slow and moves at a very constant rate so just position pid is enough), we should also only do rot at the end of each path as changing the rot will force us to recalculate our path

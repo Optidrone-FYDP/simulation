@@ -1,10 +1,34 @@
 from pid_controller import dronePID
 #from flight_sim_pid import *
 from predict_pid import *
-from uart_handler import *
+from uart_handler_2 import *
 from vicon_handler import *
 import keyboard
 import time
+import serial
+
+# uart_port = serial.Serial("COM5", 9600, timeout=5)
+
+# def controller_on():
+#     uart_port.write(bytes.fromhex("31"))
+
+# def start_flight():
+#     uart_port.write(bytes.fromhex("32"))
+#     uart_port.write(bytes.fromhex("33"))
+#     uart_port.write(bytes.fromhex("34"))
+
+# def send_to_controller(next_inputs):
+#     uart_port.write(bytes.fromhex("04"))    #left/right
+#     uart_port.write(hex_helper(next_inputs[0]))
+#     uart_port.write(bytes.fromhex("03"))    #front/back
+#     uart_port.write(hex_helper(next_inputs[1]))
+#     uart_port.write(bytes.fromhex("01"))    #up/down
+#     uart_port.write(hex_helper(next_inputs[2]))
+#     uart_port.write(bytes.fromhex("02"))    #rotation
+#     uart_port.write(hex_helper(next_inputs[3]))
+
+# def land():
+#     uart_port.write(bytes.fromhex("10"))
 
 if __name__ == "__main__":
 
@@ -29,16 +53,18 @@ if __name__ == "__main__":
         inputs = [0, 0, 1000]
     else:
         inputs = sys.argv[2:5]
-
+    
     print("starting predictor")
     pred.start_predictor(inputs)
 
+    
+
     if mode == "vicon":
-        open_serial()
+        time.sleep(10)
         print("controller on")
         controller_on()
 
-    time.sleep(2.2)
+    time.sleep(3)
 
     print("beginning flight controller")
     print(path)
@@ -65,9 +91,12 @@ if __name__ == "__main__":
             else:
                 pid.get_pos(vicon.get_frame())
             next_pots = pid.update()
-            if pred.reached_target == True or keyboard.is_pressed('k'):
+            if pid.reached_target == True or keyboard.is_pressed('k'):
                 break
-            print(pred.current_position)
+            if mode == "sim":
+                print(pred.current_position)
+            else:
+                print(vicon.curr_pos)
             print(next_pots)
             if mode == "sim":
                 pred.predict_next(next_pots)

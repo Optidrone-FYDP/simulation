@@ -4,8 +4,8 @@ import time
 import json
 import pandas as pd
 
-uart_port = None #uart_port = serial.Serial("COM5", 9600, timeout=5)
-fps = 30
+#uart_port = None #uart_port = serial.Serial("COM5", 9600, timeout=5)
+#fps = 30
 
 def hex_helper(int_in):
     hex_str = hex(int_in)[hex(int_in).find('x')+1:]
@@ -14,18 +14,15 @@ def hex_helper(int_in):
     return bytes.fromhex(hex_str)
 
 on = False
-
-def open_serial():
-    global uart_port
-    uart_port = serial.Serial("COM5", 9600, timeout=5)
+    
 
 # FUNCTIONS
-def controller_on():
+def controller_on(uart_port):
     global on
     uart_port.write(bytes.fromhex("31"))
     on = not on
 
-def start_flight():
+def start_flight(uart_port):
     global on
     if(on):
         uart_port.write(bytes.fromhex("32"))
@@ -72,7 +69,7 @@ def start_routine():
     df = pd.DataFrame(pots, columns = ["timestamp", "potZ", "potRot", "potY", "potX", "potCam"])
     df.to_csv(plan_name + "_out.csv")
 
-def send_to_controller(next_inputs):
+def send_to_controller(uart_port, next_inputs):
     uart_port.write(bytes.fromhex("04"))    #left/right
     uart_port.write(hex_helper(next_inputs[0]))
     uart_port.write(bytes.fromhex("03"))    #front/back
@@ -97,7 +94,7 @@ def update_flight():
     uart_port.write(bytes.fromhex("04"))
     uart_port.write(hex_helper(lr))
 
-def land():
+def land(uart_port):
     uart_port.write(bytes.fromhex("10"))
 
 def joy_status():

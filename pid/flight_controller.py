@@ -69,11 +69,12 @@ if __name__ == "__main__":
             next_pots = pid.update()
             if pid.reached_target == True or keyboard.is_pressed('k'):
                 print("k is pressed, aborting")
-                print(f"max vel: {pid.max_vel}")
                 land()
                 time.sleep(4)
                 controller_on()
                 time.sleep(5)
+                df = pd.DataFrame(path_plot, columns=['x','y','z','rot'])
+                df.to_csv("output/output_path.csv", index=False)
                 sys.exit()
             if keyboard.is_pressed('n'):
                 print("n is pressed, moving to next setpoint")

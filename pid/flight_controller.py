@@ -5,6 +5,7 @@ from vicon_handler import *
 import keyboard
 import time
 import serial
+import pandas
 
 if __name__ == "__main__":
 
@@ -15,6 +16,8 @@ if __name__ == "__main__":
     pred = Predictor(DroneMovementModel().to(dev), "models/drone_movement_model_lstm_0.4.pt", 20, dev)
 
     path = pd.read_csv("paths/plan1.csv")
+
+    path_plot = []
 
     vicon = Vicon()
     vicon.connect()
@@ -51,6 +54,7 @@ if __name__ == "__main__":
             pid.get_pos(pred.current_position)
         else:
             pid.get_pos(vicon.get_frame())
+            path_plot.append(pid.current_pos)
         pid.setpoint(row['x'], row['y'], row['z'], row['rot'])
         while True:
             #print("running")
@@ -61,6 +65,7 @@ if __name__ == "__main__":
                 pid.get_pos(pred.current_position)
             else:
                 pid.get_pos(vicon.get_frame())
+                path_plot.append(pid.current_pos)
             next_pots = pid.update()
             if pid.reached_target == True or keyboard.is_pressed('k'):
                 print("k is pressed, aborting")
@@ -90,4 +95,6 @@ if __name__ == "__main__":
     time.sleep(4)
     controller_on()
     time.sleep(5)
+    df = pd.DataFrame(path_plot, columns=['x','y','z','rot'])
+    df.to_csv("output/output_path.csv", index=False)
     sys.exit()

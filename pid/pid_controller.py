@@ -11,7 +11,7 @@ class dronePID:
         self.prev_pos = [0, 0, 0, 0]
         self.target_pos = [0, 0, 0, 0]
         self.starting_pos = [0, 0, 0, 0]
-        self.Kp = [0.2, 70, 0.1, 0.3]
+        self.Kp = [0.2, 70, 0.1, 0.6]
         self.Ki = [0, 0, 0, 0.002]
         self.Kd = [0, 0, 0.05, 0.25]
         self.error = [0, 0, 0, 0]

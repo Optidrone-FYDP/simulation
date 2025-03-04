@@ -6,7 +6,6 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 import random
 
-# Set random seed for reproducibility
 seed_value = 42
 random.seed(seed_value)
 np.random.seed(seed_value)
@@ -16,8 +15,8 @@ if torch.cuda.is_available():
 
 PREDICT_ROTATION = True
 
-DATA_PATH = "processed_data_v2"
-MODEL_SAVE_PATH = "drone_movement_model_lstm_0.4.pt"
+DATA_PATH = "../final_train_set"
+MODEL_SAVE_PATH = "models/drone_movement_model_lstm_0.5-rot.pt"
 EPOCHS, BATCH_SIZE, LR = 1000, 32, 1e-3
 SEQ_LENGTH, HIDDEN_SIZE, NUM_LAYERS = 20, 64, 2
 TRAIN_SPLIT = 0.8
@@ -37,7 +36,6 @@ class DroneDataset(Dataset):
         ]
         self.data = np.concatenate(dfs, axis=0) if dfs else np.empty((0, 11))
         if self.data.size:
-            # Normalize potentiometer inputs consistently.
             self.data[:, 10] = normalize_pot(self.data[:, 10])  # potX
             self.data[:, 9] = normalize_pot(self.data[:, 9])    # potY
             self.data[:, 7] = normalize_pot(self.data[:, 7])    # potZ
@@ -51,7 +49,7 @@ class DroneDataset(Dataset):
         sequence = self.data[idx : idx + SEQ_LENGTH]
         # normalized potentiometer readings [potX, potY, potZ, potRot]
         inputs = sequence[:, [10, 9, 7, 8]]
-        
+
         if PREDICT_ROTATION:
             # columns 4, 5, 6 (TX, TY, TZ)
             trans_delta = self.data[idx + SEQ_LENGTH, [4, 5, 6]] - self.data[idx + SEQ_LENGTH - 1, [4, 5, 6]]
@@ -106,8 +104,9 @@ for epoch in range(1, EPOCHS + 1):
     for inputs, targets in train_loader:
         inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
         outputs = model(inputs)
-        loss = criterion(outputs, targets)
+        loss = torch.sqrt(criterion(outputs, targets))
         optimizer.zero_grad()
+        criterion = nn.MSELoss()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
@@ -119,11 +118,11 @@ for epoch in range(1, EPOCHS + 1):
         for inputs, targets in test_loader:
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             outputs = model(inputs)
-            test_loss += criterion(outputs, targets).item()
+            loss = torch.sqrt(criterion(outputs, targets))
+            test_loss += loss.item()
     avg_test_loss = test_loss / len(test_loader)
 
     scheduler.step()
-
     train_losses.append(avg_train_loss)
     test_losses.append(avg_test_loss)
     epochs_record.append(epoch)

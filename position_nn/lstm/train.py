@@ -2,17 +2,9 @@ import os, glob
 import pandas as pd
 import numpy as np
 import torch, torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split
-import matplotlib.pyplot as plt
-import random
+from torch.utils.data import Dataset, DataLoader
 
-seed_value = 42
-random.seed(seed_value)
-np.random.seed(seed_value)
-torch.manual_seed(seed_value)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(seed_value)
-
+<<<<<<< HEAD:position_nn/lstm/train.py
 PREDICT_ROTATION = True
 
 DATA_PATH = "../final_train_set"
@@ -26,10 +18,18 @@ ROT_NORM_FACTOR = 2 * np.pi
 def normalize_pot(x):
     """Normalize potentiometer value: from [0, 128] to [-1, 1]."""
     return (x - 64.0) / 64.0
+=======
+DATA_PATH = "processed_data"
+MODEL_SAVE_PATH = "drone_movement_model_5k.pt"
+EPOCHS, BATCH_SIZE, LR = 5000, 32, 1e-3
+SEQ_LENGTH, HIDDEN_SIZE, NUM_LAYERS = 10, 64, 1
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+>>>>>>> shawn/pid-integration:position_nn/train.py
 
 class DroneDataset(Dataset):
-    def __init__(self, folder):
+    def __init__(self, folder, _):
         files = sorted(glob.glob(os.path.join(folder, "*.csv")))
+<<<<<<< HEAD:position_nn/lstm/train.py
         dfs = [
             pd.read_csv(f, encoding="utf-8-sig").values.astype(np.float32)
             for f in files
@@ -41,11 +41,20 @@ class DroneDataset(Dataset):
             self.data[:, 7] = normalize_pot(self.data[:, 7])    # potZ
             self.data[:, 8] = normalize_pot(self.data[:, 8])    # potRot
         print("Dataset shape:", self.data.shape)
+=======
+        dfs = [ pd.read_csv(f).values.astype(np.float32) for f in files ]
+        if dfs:
+            self.data = np.concatenate(dfs, axis=0)
+        else:
+            self.data = np.empty((0, 9))
+        print(self.data)
+>>>>>>> shawn/pid-integration:position_nn/train.py
 
     def __len__(self):
         return len(self.data) - SEQ_LENGTH if len(self.data) >= SEQ_LENGTH else 0
 
     def __getitem__(self, idx):
+<<<<<<< HEAD:position_nn/lstm/train.py
         sequence = self.data[idx : idx + SEQ_LENGTH]
         # normalized potentiometer readings [potX, potY, potZ, potRot]
         inputs = sequence[:, [10, 9, 7, 8]]
@@ -63,6 +72,12 @@ class DroneDataset(Dataset):
 
 class DroneMovementModel(nn.Module):
     def __init__(self, input_dim=4, hidden_dim=64, output_dim=3, num_layers=2):
+=======
+        return self.data[idx:idx+SEQ_LENGTH, 6:9], self.data[idx+SEQ_LENGTH, 0:6]
+
+class DroneMovementModel(nn.Module):
+    def __init__(self, input_dim=3, hidden_dim=64, output_dim=6, num_layers=1):
+>>>>>>> shawn/pid-integration:position_nn/train.py
         super(DroneMovementModel, self).__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
@@ -71,6 +86,7 @@ class DroneMovementModel(nn.Module):
         out, _ = self.lstm(x)
         return self.fc(out[:, -1, :])
 
+<<<<<<< HEAD:position_nn/lstm/train.py
 # adjust model output dimension
 output_dim = 6 if PREDICT_ROTATION else 3
 
@@ -97,13 +113,23 @@ best_model_state = None
 train_losses = []
 test_losses = []
 epochs_record = []
+=======
+# training
+dataset = DroneDataset(DATA_PATH, SEQ_LENGTH)
+if len(dataset) == 0:
+    raise ValueError("Dataset is empty. check csvs.")
+loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+model = DroneMovementModel(input_dim=3, hidden_dim=HIDDEN_SIZE, output_dim=6, num_layers=NUM_LAYERS).to(DEVICE)
+criterion, optimizer = nn.MSELoss(), torch.optim.Adam(model.parameters(), lr=LR)
+>>>>>>> shawn/pid-integration:position_nn/train.py
 
 for epoch in range(1, EPOCHS + 1):
     model.train()
-    train_loss = 0
-    for inputs, targets in train_loader:
+    total_loss = 0
+    for i, (inputs, targets) in enumerate(loader, 1):
         inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
         outputs = model(inputs)
+<<<<<<< HEAD:position_nn/lstm/train.py
         loss = torch.sqrt(criterion(outputs, targets))
         optimizer.zero_grad()
         criterion = nn.MSELoss()
@@ -165,3 +191,14 @@ plt.ylabel("Loss")
 plt.title("Training and Validation Loss Over Time")
 plt.legend()
 plt.savefig("loss.png")
+=======
+        loss = criterion(outputs, targets)
+        optimizer.zero_grad(); loss.backward(); optimizer.step()
+        total_loss += loss.item()
+        if i % 100 == 0:
+            print(f"Epoch {epoch}/{EPOCHS}, Step {i}, Loss: {loss.item():.4f}")
+    print(f"Epoch {epoch}/{EPOCHS} - Avg Loss: {total_loss/len(loader):.4f}")
+
+torch.save(model.state_dict(), MODEL_SAVE_PATH)
+print(f"Model saved to {MODEL_SAVE_PATH}")
+>>>>>>> shawn/pid-integration:position_nn/train.py

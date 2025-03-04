@@ -5,7 +5,6 @@ import pandas as pd
 DATA_DIR = "raw_data"
 OUTPUT_DIR = "processed_data"
 
-
 class Metadata:
     """
     fps: int            framerate of the data capture
@@ -19,8 +18,7 @@ class Metadata:
         self.fps = fps
 
     def __repr__(self):
-        # Zero-pad the id to two digits (e.g., id01_30)
-        return f"id{self.id:02d}_{self.fps}"
+        return f"id{self.id}_{self.fps}"
 
 
 def extract_metadata_from(file_name):
@@ -40,10 +38,9 @@ def extract_metadata_from(file_name):
         )
 
     try:
-        # Even if the file name has leading zeros (e.g., "001"), we convert to int.
-        id = int(parts[0])
-        start_frame = int(parts[1][1:])  # e.g., "f100" -> 100
-        fps = parts[2]
+        id = int(parts[0])  # 001
+        start_frame = int(parts[1][1:])  # f100 -> 100
+        fps = (parts[2])  # 30
 
         return Metadata(
             id=id,
@@ -56,11 +53,9 @@ def extract_metadata_from(file_name):
 
 def extract_vicon_data(file_path, start_frame, duration):
     """
-    Remove metadata/subheaders from CSV.
-    Retains the following columns: Frame, RX, RY, RZ, TX, TY, TZ.
-    Filters data only to "good" rows and skips rows that have no other values.
-    Uses the start_frame from the vicon filename and extracts a window of 'duration' frames,
-    where 'duration' is the sum of the pot input durations.
+    Remove metadata/subheaders from CSV
+    Retains the following columns: Frame, RX, RY, RZ, TX, TY, TZ, potX, potY, potZ
+    Filter data only to good rows
     """
     df = pd.read_csv(
         file_path,
@@ -76,74 +71,37 @@ def extract_vicon_data(file_path, start_frame, duration):
         ],
     )
 
-    # Convert Frame column to numeric and drop rows where Frame is NaN.
     df["Frame"] = pd.to_numeric(df["Frame"], errors="coerce")
+
     df.dropna(subset=["Frame"], inplace=True)
 
-    # Drop rows where all motion data columns are missing.
-    df.dropna(subset=["RX", "RY", "RZ", "TX", "TY", "TZ"], how="all", inplace=True)
-
-    # Check if the vicon file covers the required window (based on pot duration).
-    # We need frames from start_frame up to start_frame + duration.
-    if df["Frame"].max() < start_frame + duration:
-        print(
-            "ERROR: the recorded vicon valid data window is less than the pot flight inputs!"
-        )
+    if df.shape[0] < start_frame + duration:
+        print(f"ERROR: the recorded vicon valid data window is less than pot flight inputs!")
         sys.exit(1)
-
-    # Filter the DataFrame to extract the window based on the file name's start_frame and pot duration.
-    df = df[(df["Frame"] >= start_frame) & (df["Frame"] < start_frame + duration)]
-
-    # Reset Frame numbers to start from 1.
-    df["Frame"] = range(1, len(df) + 1)
-
+    df = df[(df["Frame"] >= start_frame) & (df["Frame"] <= start_frame + duration)]
+    df.set_index("Frame", inplace=True)
     return df
 
 
 def extract_pot_data(file_path):
-    """
-    Reads the pot file, expands the pot data based on the duration of each row,
-    and returns both the expanded pot DataFrame and the total duration (sum of durations).
-    """
     df = pd.read_csv(
         file_path,
         skiprows=[],
         usecols=[
+            "timestamp",
             "potZ",
             "potRot",
             "potY",
             "potX",
-            "duration",
         ],
     )
 
-    expanded_pot_data = []
-    frame_list = []  # Track frame numbers
-
-    frame_counter = 1  # Start from 1 instead of 0
-    for _, row in df.iterrows():
-        # Each row's pot data is repeated for the number of frames indicated by 'duration'
-        expanded_pot_data.extend([row.drop("duration").values] * row["duration"])
-        frame_list.extend(range(frame_counter, frame_counter + row["duration"]))
-        frame_counter += row["duration"]
-
-    expanded_pot_df = pd.DataFrame(
-        expanded_pot_data, columns=["potZ", "potRot", "potY", "potX"]
-    )
-
-    # Assign frame numbers starting from 1.
-    expanded_pot_df["Frame"] = frame_list
-
-    # The total duration is the sum of the duration column.
-    duration = df["duration"].sum()
-    return expanded_pot_df, duration
-
+    duration = df.shape[0]
+    return df, duration
 
 def process_data(data_dir, output_dir):
     """
-    Process input CSV files (vicon and pot), merge them, and write out a cleaned version.
-    The window of frames extracted from the vicon data is determined dynamically based on
-    the sum of the pot input durations, starting at the frame specified in the vicon file name.
+    Process input CSV and write out a cleaned version.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -154,30 +112,40 @@ def process_data(data_dir, output_dir):
 
     for vicon_file in vicon_files:
         metadata = extract_metadata_from(vicon_file)
-        # Use zero-padded id for the pot file name (e.g., pot-01-30.csv)
-        pot_file = f"pot-{metadata.id:02d}-{metadata.fps}.csv"
+        pot_file = f"pot-{metadata.id}-{metadata.fps}.csv"
 
         vicon_file_path = os.path.join(data_dir, "vicon", vicon_file)
         pot_file_path = os.path.join(data_dir, "pot", pot_file)
 
         if not os.path.exists(pot_file_path):
-            print(
-                f"ERROR: pot file (expected {pot_file_path}) missing for {vicon_file}."
-            )
+            print(f"ERROR: pot file (expected {pot_file_path}) missing for {vicon_file}.")
             sys.exit(1)
 
-        pot_df, duration = extract_pot_data(pot_file_path)
+        pot_df, duration = extract_pot_data(pot_file_path,)
         vicon_df = extract_vicon_data(vicon_file_path, metadata.start_frame, duration)
 
-        # Check that the extracted vicon frame count matches the pot duration.
-        if len(vicon_df) != duration:
+        if len(vicon_df) != len(pot_df):
             print(
-                f"Frame mismatch: Vicon has {len(vicon_df)} frames, but Pot expects {duration} frames for {vicon_file}. Skipping..."
+                f"Row mismatch between vicon ({len(vicon_df)}) and pot ({len(pot_df)}) data for {vicon_file}. Skipping..."
             )
             continue
 
-        # Merge the vicon and pot data on the 'Frame' column.
-        df = pd.merge(vicon_df, pot_df, on="Frame", how="inner")
+        # align the indices to avoid mismatches
+        pot_df = pot_df.reset_index(drop=True)
+        vicon_df = vicon_df.reset_index(drop=True)
+
+        # column-wise concatenation
+        df = pd.concat([vicon_df, pot_df], axis=1)
+
+        # Reset the index to write a clean output
+        df.reset_index(drop=True, inplace=True)
+
+        # Merge the two DataFrames
+        # df = pd.concat([df1, df2], axis=1)
+        df = pd.concat([vicon_df, pot_df.reset_index(drop=True)], axis=1)
+
+        # Reset the index to write a clean output
+        df.reset_index(inplace=True)
 
         if df.empty:
             print(f"No valid frames in {vicon_file}. Skipping...")
@@ -188,6 +156,8 @@ def process_data(data_dir, output_dir):
         out_name = f"{repr(metadata)}.csv"
         out_path = os.path.join(output_dir, out_name)
 
+        # save CSV
+        df.reset_index(inplace=True)
         df.to_csv(out_path, index=False)
         print(f"Wrote {out_path}")
 

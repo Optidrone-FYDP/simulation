@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import random
 
 # Toggle to predict rotation along with translation.
-PREDICT_ROTATION = True  # Set to False to predict only translation
+PREDICT_ROTATION = False  # Set to False to predict only translation
 
-MODEL_PATH = "models/drone_movement_model_lstm_0.5-rot.pt"
+MODEL_PATH = "models/drone_movement_model_lstm_0.4.pt"
 SEQ_LENGTH = 20
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 ROT_NORM_FACTOR = 2 * np.pi

@@ -22,7 +22,7 @@ class Serial:
         if self.mock:
             print(f"[Serial] WRITE (mock): {data.hex()}")
         else:
-            print(f"[Serial] WRITE (real): {data.hex()}")
+            #print(f"[Serial] WRITE (real): {data.hex()}")
             self.real_serial.write(data)
 
     def read(self, size=1) -> bytes:
@@ -97,8 +97,18 @@ def send_to_controller(next_inputs):
     UART_PORT.write(bytes.fromhex("02"))    #rotation
     UART_PORT.write(hex_helper(next_inputs[3]))
 
+def all_neutral():
+    UART_PORT.write(bytes.fromhex("04"))    #left/right
+    UART_PORT.write(hex_helper(64))
+    UART_PORT.write(bytes.fromhex("03"))    #front/back
+    UART_PORT.write(hex_helper(64))
+    UART_PORT.write(bytes.fromhex("01"))    #up/down
+    UART_PORT.write(hex_helper(64))
+    UART_PORT.write(bytes.fromhex("02"))    #rotation
+    UART_PORT.write(hex_helper(64))
+
 def land():
-    flight_status.set("Landing")
+    #flight_status.set("Landing")
     print("Landing...")
     UART_PORT.write(bytes.fromhex("10"))
 

@@ -22,10 +22,11 @@ class Vicon:
     def get_frame(self):
         ret = self.client.GetFrame()
         if ret:
-            print("Frame received")
+            #print("Frame received")
+            x=2
         else:
             print(f"Frame not received. Error code: {ret}")
-        print(f"Frame {self.client.GetFrameNumber()} received.")
+        #print(f"Frame {self.client.GetFrameNumber()} received.")
         
         if self.drone_name is None:
             self.drone_name = self.client.GetSubjectNames()[0]

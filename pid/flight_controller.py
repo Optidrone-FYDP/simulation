@@ -15,7 +15,7 @@ if __name__ == "__main__":
     pid = dronePID(mode=mode)
     pred = Predictor(DroneMovementModel().to(dev), "models/drone_movement_model_lstm_0.4.pt", 20, dev)
 
-    path = pd.read_csv("paths/plan1.csv")
+    path = pd.read_csv("paths/plan3.csv")
 
     path_plot = []
 

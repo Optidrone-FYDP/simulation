@@ -1,5 +1,0 @@
-DATA_DIR = "data"
-OUTPUT_DIR = "out"
-BATCH_SIZE = 100
-INTERPOLATE = False
-CUTOFF = True

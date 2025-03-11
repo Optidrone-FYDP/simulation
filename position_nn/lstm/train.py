@@ -42,7 +42,6 @@ class DroneDataset(Dataset):
             self.data[:, 10] = normalize_pot(self.data[:, 10])  # potX
             self.data[:, 9] = normalize_pot(self.data[:, 9])    # potY
             self.data[:, 7] = normalize_pot(self.data[:, 7])    # potZ
-            # self.data[:, 8] = normalize_pot(self.data[:, 8])    # potRot
         print("Dataset shape:", self.data.shape)
 
     def __len__(self):
@@ -105,6 +104,7 @@ for epoch in range(1, EPOCHS + 1):
         outputs = model(inputs)
         train_loss = torch.sqrt(criterion(outputs, targets))
         optimizer.zero_grad()
+        criterion = nn.MSELoss()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()

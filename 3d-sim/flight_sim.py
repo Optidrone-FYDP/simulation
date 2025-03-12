@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.flight_plan_2 = []
         self.time_delay = 0.10
         self.time_delay_display = 0
-        
+
         self.flying = False
         self.curr_frame = 0
 
@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         if not self.drone_mesh_filename:
             self.error_dialog.showMessage('No drone mesh imported!')
             return
-        
+
         self.mesh_2 = gl.GLMeshItem(meshdata=self.meshdata, smooth=True, drawFaces=False, drawEdges=True)
         self.viewer.addItem(self.mesh_2)
 
@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
         self.flight_plan_in_2 = pd.read_csv(self.flight_plan_filename_2)
 
         factor = 100
-        
+
         self.flight_plan_x_2 = self.flight_plan_in_2["TX"][1] / factor
         self.flight_plan_y_2 = self.flight_plan_in_2["TY"][1] / factor
         self.flight_plan_z_2 = self.flight_plan_in_2["TZ"][1] / factor
@@ -238,18 +238,18 @@ class MainWindow(QMainWindow):
         if not self.flight_plan_filename:
             self.error_dialog.showMessage('No flight plan imported!')
             return
-        
+
         if self.flying:
             self.flying = False
             self.btn_start_stop.setText("Start")
         else:
             self.flying = True
             self.btn_start_stop.setText("Stop")
-        
+
         second_flight = False
         if self.flight_plan_filename_2:
             second_flight = True
-        
+
         if self.curr_frame >= len(self.flight_plan):
             self.curr_frame = 0
 
@@ -273,10 +273,11 @@ class MainWindow(QMainWindow):
                 self.curr_frame += 1
             else:
                 break
-        
+
         # if loop broke because EOF
         if self.flying:
             self.flying = False
+            self.btn_start_stop.setText("Start/Stop")
 
     def slow_down(self):
         self.time_delay += 0.01

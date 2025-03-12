@@ -89,9 +89,9 @@ class MainWindow(QMainWindow):
 
         # ROW 4
 
-        btn_start_stop = QPushButton('Start/Stop Flight', self)
-        btn_start_stop.clicked.connect(self.start_stop_flight)
-        layout.addWidget(btn_start_stop, 4, 0, 1, 3)
+        self.btn_start_stop = QPushButton('Start/Stop Flight', self)
+        self.btn_start_stop.clicked.connect(self.start_stop_flight)
+        layout.addWidget(self.btn_start_stop, 4, 0, 1, 3)
 
         # ROW 5
 
@@ -156,20 +156,20 @@ class MainWindow(QMainWindow):
 
         self.flight_plan_in = pd.read_csv(self.flight_plan_filename)
 
-        self.flight_plan_x = self.flight_plan_in["TX"][1]
-        self.flight_plan_y = self.flight_plan_in["TY"][1]
-        self.flight_plan_z = self.flight_plan_in["TZ"][1]
+        factor = 100
+
+        self.flight_plan_x = self.flight_plan_in["TX"][1] / factor
+        self.flight_plan_y = self.flight_plan_in["TY"][1] / factor
+        self.flight_plan_z = self.flight_plan_in["TZ"][1] / factor
         print(self.flight_plan_x)
 
         self.flight_plan.clear()
 
-        curr_row = (0, 0, 0)
+        curr_row = (self.flight_plan_x, self.flight_plan_y, self.flight_plan_z)
         self.flight_plan.append(curr_row)
         prev_x = self.flight_plan_x
         prev_y = self.flight_plan_y
         prev_z = self.flight_plan_z
-
-        factor = 10
 
         for idx, row in self.flight_plan_in.iterrows():
             if idx == 0 or idx == 1:
@@ -202,20 +202,19 @@ class MainWindow(QMainWindow):
 
         self.flight_plan_in_2 = pd.read_csv(self.flight_plan_filename_2)
 
-        self.flight_plan_x_2 = self.flight_plan_in_2["TX"][1]
-        self.flight_plan_y_2 = self.flight_plan_in_2["TY"][1]
-        self.flight_plan_z_2 = self.flight_plan_in_2["TZ"][1]
-        # print(self.flight_plan_x)
+        factor = 100
+        
+        self.flight_plan_x_2 = self.flight_plan_in_2["TX"][1] / factor
+        self.flight_plan_y_2 = self.flight_plan_in_2["TY"][1] / factor
+        self.flight_plan_z_2 = self.flight_plan_in_2["TZ"][1] / factor
 
         self.flight_plan_2.clear()
 
-        curr_row = (0, 0, 0)
+        curr_row = (self.flight_plan_x_2, self.flight_plan_y_2, self.flight_plan_z_2)
         self.flight_plan_2.append(curr_row)
         prev_x = self.flight_plan_x_2
         prev_y = self.flight_plan_y_2
         prev_z = self.flight_plan_z_2
-
-        factor = 10
 
         for idx, row in self.flight_plan_in_2.iterrows():
             if idx == 0 or idx == 1:
@@ -232,11 +231,6 @@ class MainWindow(QMainWindow):
 
 
     def start_stop_flight(self):
-        if self.flying:
-            self.flying = False
-        else:
-            self.flying = True
-
         if not self.drone_mesh_filename:
             self.error_dialog.showMessage('No drone mesh imported!')
             return
@@ -244,6 +238,13 @@ class MainWindow(QMainWindow):
         if not self.flight_plan_filename:
             self.error_dialog.showMessage('No flight plan imported!')
             return
+        
+        if self.flying:
+            self.flying = False
+            self.btn_start_stop.setText("Start")
+        else:
+            self.flying = True
+            self.btn_start_stop.setText("Stop")
         
         second_flight = False
         if self.flight_plan_filename_2:
@@ -310,6 +311,7 @@ class MainWindow(QMainWindow):
         self.drone_mesh_filename = ""
         self.flight_plan_filename = ""
         self.flight_plan_filename_2 = ""
+        self.btn_start_stop.setText("Start/Stop")
         self.flight_plan = []
         self.flight_plan_2 = []
         self.time_delay = 0.10
@@ -324,9 +326,12 @@ class MainWindow(QMainWindow):
 
 
     def reset_flight(self):
+        self.btn_start_stop.setText("Start/Stop")
         print('Resetting animation...')
         self.mesh.resetTransform()
         self.mesh_2.resetTransform()
+        self.flying = False
+        self.curr_frame = 0
 
 
 if __name__ == '__main__':

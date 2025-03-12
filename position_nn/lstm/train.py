@@ -87,7 +87,7 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
-patience = 20
+patience = 80
 best_validation_loss = float("inf")
 epochs_without_improvement = 0
 best_model_state = None
@@ -127,7 +127,7 @@ for epoch in range(1, EPOCHS + 1):
             mae = torch.mean(torch.abs(outputs - targets))
             validation_mae += mae.item()
 
-    avg_validation_mae = total_mae / len(train_loader)
+    avg_validation_mae = validation_mae / len(validation_loader)
     avg_validation_loss = validation_loss / len(validation_loader)
 
     scheduler.step()
@@ -156,8 +156,7 @@ for epoch in range(1, EPOCHS + 1):
     else:
         epochs_without_improvement += 1
 
-    if epoch % 100 == 1:
-        print(f"Epoch {epoch}/{EPOCHS} - Train Loss: {avg_train_loss:.4f}, Validation Loss: {best_validation_loss:.4f}\n Train MAE: {avg_train_mae:.4f} mm, Validation MAE: {avg_validation_mae:.4f} mm")
+    print(f"Epoch {epoch}/{EPOCHS} - Train Loss: {avg_train_loss:.4f}, Validation Loss: {best_validation_loss:.4f}\n Train MAE: {avg_train_mae:.4f} mm, Validation MAE: {avg_validation_mae:.4f} mm")
 
     if epochs_without_improvement >= patience:
         print(f"Early stopping at epoch {epoch}. Best Validation Loss: {best_validation_loss:.4f}")
